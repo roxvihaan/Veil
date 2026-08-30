@@ -1,0 +1,1 @@
+Minimal macOS terminal with real transparency, native background blur, tabs and splits, live config commands, color ASCII images/GIFs, and persistent custom Neofetch art.

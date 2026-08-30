@@ -1,0 +1,9 @@
+node_modules/
+release/
+.cache/
+native/build/
+bin/veil-image
+.DS_Store
+*.log
+.env
+.env.*

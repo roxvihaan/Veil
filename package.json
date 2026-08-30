@@ -1,0 +1,24 @@
+{
+  "name": "veil-terminal",
+  "productName": "Veil Terminal",
+  "version": "0.0.0",
+  "description": "Minimal macOS terminal with real transparency, native background blur, tabs, splits, live config and color ASCII images/GIFs.",
+  "private": true,
+  "author": "roxvihaan",
+  "repository": { "type": "git", "url": "https://github.com/roxvihaan/Veil.git" },
+  "type": "module",
+  "main": "electron/main.cjs",
+  "engines": { "node": ">=22.12.0" },
+  "scripts": {
+    "postinstall": "node node_modules/electron/install.js && node scripts/fix-node-pty.mjs",
+    "package:mac": "node scripts/package-mac.mjs",
+    "build:veil-image": "node scripts/build-veil-image.mjs",
+    "test": "npm run test:commands && npm run test:neofetch && npm run test:latency && npm run test:sizing",
+    "test:commands": "node --test tests/veil-command.test.mjs",
+    "test:neofetch": "node --test tests/neofetch-image.test.mjs",
+    "test:latency": "node --test tests/terminal-latency.test.mjs",
+    "test:sizing": "electron tests/veil-sizing.electron.cjs"
+  },
+  "dependencies": { "node-pty": "1.1.0", "node-addon-api": "7.1.1" },
+  "devDependencies": { "electron": "43.4.1", "node-gyp": "^11.0.0" }
+}

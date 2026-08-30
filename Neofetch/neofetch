@@ -1,0 +1,98 @@
+#!/bin/sh
+
+set -eu
+
+real_neofetch="${NEOFETCH_REAL:-/usr/local/bin/neofetch}"
+config_root="${XDG_CONFIG_HOME:-${HOME}/.config}"
+config_dir="${config_root}/neofetch"
+config_path="${config_dir}/config.conf"
+ascii_path="${config_dir}/veil-image-ascii.txt"
+renderer="${VEIL_IMAGE_RENDERER:-${HOME}/.local/libexec/veil/veil-image}"
+
+usage() {
+  printf '%s\n' 'Usage: neofetch image <path>' >&2
+}
+
+if [ "${1:-}" != "image" ]; then
+  exec "$real_neofetch" "$@"
+fi
+
+if [ "$#" -ne 2 ]; then
+  usage
+  exit 2
+fi
+
+image_path="$2"
+case "$image_path" in
+  /*) ;;
+  *) image_path="${PWD}/${image_path}" ;;
+esac
+
+if [ ! -f "$image_path" ]; then
+  printf 'neofetch: image does not exist: %s\n' "$image_path" >&2
+  exit 1
+fi
+if [ ! -x "$renderer" ]; then
+  printf 'neofetch: ASCII image renderer is missing: %s\n' "$renderer" >&2
+  exit 1
+fi
+
+mkdir -p "$config_dir"
+if [ ! -f "$config_path" ]; then
+  # Neofetch 7.1.0 writes its config on this first run but may still return 1.
+  "$real_neofetch" --gen-config >/dev/null 2>&1 || true
+fi
+if [ ! -f "$config_path" ]; then
+  printf 'neofetch: could not create config: %s\n' "$config_path" >&2
+  exit 1
+fi
+
+temporary_ascii="$(mktemp "${config_dir}/.veil-image-ascii.XXXXXX")"
+temporary_config="$(mktemp "${config_dir}/.config.conf.XXXXXX")"
+temporary_palette="$(mktemp "${config_dir}/.veil-image-palette.XXXXXX")"
+trap 'rm -f "$temporary_ascii" "$temporary_config" "$temporary_palette"' EXIT HUP INT TERM
+
+VEIL_IMAGE_NEOFETCH=1 VEIL_IMAGE_PALETTE_FILE="$temporary_palette" \
+  VEIL_IMAGE_WIDTH=38 VEIL_IMAGE_HEIGHT=26 \
+  "$renderer" "$image_path" > "$temporary_ascii"
+
+read -r palette1 palette2 palette3 palette4 palette5 palette6 < "$temporary_palette"
+
+awk -v source="$ascii_path" -v palette="$palette1 $palette2 $palette3 $palette4 $palette5 $palette6" '
+  BEGIN { backend = 0; image = 0; bold = 0; colors = 0 }
+  /^[[:space:]]*image_backend[[:space:]]*=/ {
+    print "image_backend=\"ascii\""
+    backend = 1
+    next
+  }
+  /^[[:space:]]*image_source[[:space:]]*=/ {
+    print "image_source=\"" source "\""
+    image = 1
+    next
+  }
+  /^[[:space:]]*ascii_bold[[:space:]]*=/ {
+    print "ascii_bold=\"off\""
+    bold = 1
+    next
+  }
+  /^[[:space:]]*ascii_colors[[:space:]]*=/ {
+    print "ascii_colors=(" palette ")"
+    colors = 1
+    next
+  }
+  { print }
+  END {
+    if (!backend) print "image_backend=\"ascii\""
+    if (!image) print "image_source=\"" source "\""
+    if (!bold) print "ascii_bold=\"off\""
+    if (!colors) print "ascii_colors=(" palette ")"
+  }
+' "$config_path" > "$temporary_config"
+
+mv "$temporary_ascii" "$ascii_path"
+mv "$temporary_config" "$config_path"
+rm -f "$temporary_palette"
+trap - EXIT HUP INT TERM
+
+printf 'Neofetch ASCII image set to %s\n' "$image_path"
+exec "$real_neofetch"

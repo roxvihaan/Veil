@@ -1,0 +1,285 @@
+#!/bin/sh
+
+set -eu
+
+usage() {
+  printf '%s\n' \
+    'Usage: veil clear [1-100|default]' \
+    '       veil liquid [1-100|default]' \
+    '       veil text [color|default]' \
+    '       veil default [text]' \
+    '       veil mac text' \
+    '       veil image <path>'
+}
+
+default_text="#eef3ea"
+default_font_family="JetBrains Mono, SFMono-Regular, Menlo, monospace"
+default_font_size="14"
+default_font_weight="450"
+mac_font_family="SFMono-Regular, SF Mono, Menlo, monospace"
+mac_font_size="11"
+mac_font_weight="400"
+update_mode="0"
+update_text="0"
+update_typography="0"
+opacity=""
+blur=""
+clear_mode=""
+glass_mode=""
+foreground=""
+font_family=""
+font_size=""
+font_weight=""
+
+if [ "$#" -lt 1 ] || [ "$#" -gt 2 ]; then
+  usage
+  exit 2
+fi
+
+if [ "$1" = "image" ]; then
+  if [ "$#" -ne 2 ]; then
+    usage
+    exit 2
+  fi
+  script_dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+  if [ ! -x "${script_dir}/veil-image" ]; then
+    printf '%s\n' 'veil: image renderer is missing from this installation.' >&2
+    exit 1
+  fi
+  exec "${script_dir}/veil-image" "$2"
+fi
+
+command="$1"
+requested="${2:-default}"
+
+case "$command" in
+  clear)
+    update_mode="1"
+    case "$requested" in
+      default|deafault)
+        opacity="0"
+        blur="0"
+        clear_mode="true"
+        glass_mode="clear"
+        message="Clear transparency restored to default (100%)."
+        ;;
+      ''|*[!0-9]*)
+        printf '%s\n' 'Clear transparency must be a whole number from 1 to 100, or default.' >&2
+        exit 2
+        ;;
+      *)
+        if ! awk -v value="$requested" 'BEGIN { exit value >= 1 && value <= 100 ? 0 : 1 }'; then
+          printf '%s\n' 'Clear transparency must be a whole number from 1 to 100, or default.' >&2
+          exit 2
+        fi
+        opacity="$(awk -v transparency="$requested" 'BEGIN { printf "%.3f", 1 - (transparency / 100) }')"
+        blur="0"
+        clear_mode="true"
+        glass_mode="clear"
+        message="Clear transparency set to ${requested}%."
+        ;;
+    esac
+    ;;
+  liquid)
+    update_mode="1"
+    case "$requested" in
+      default|deafault)
+        opacity="0"
+        blur="28"
+        clear_mode="false"
+        glass_mode="liquid"
+        message="Liquid transparency restored to default (100%)."
+        ;;
+      ''|*[!0-9]*)
+        printf '%s\n' 'Liquid transparency must be a whole number from 1 to 100, or default.' >&2
+        exit 2
+        ;;
+      *)
+        if ! awk -v value="$requested" 'BEGIN { exit value >= 1 && value <= 100 ? 0 : 1 }'; then
+          printf '%s\n' 'Liquid transparency must be a whole number from 1 to 100, or default.' >&2
+          exit 2
+        fi
+        opacity="$(awk -v transparency="$requested" 'BEGIN { printf "%.3f", 1 - (transparency / 100) }')"
+        blur="28"
+        clear_mode="false"
+        glass_mode="liquid"
+        message="Liquid transparency set to ${requested}%."
+        ;;
+    esac
+    ;;
+  text)
+    update_text="1"
+    case "$requested" in
+      default|deafault)
+        foreground="$default_text"
+        update_typography="1"
+        font_family="$default_font_family"
+        font_size="$default_font_size"
+        font_weight="$default_font_weight"
+        ;;
+      black) foreground="#000000" ;;
+      white) foreground="#ffffff" ;;
+      red) foreground="#ff5f57" ;;
+      green|lime) foreground="#79f26f" ;;
+      yellow) foreground="#ffd866" ;;
+      blue) foreground="#61afef" ;;
+      magenta|purple) foreground="#bd93f9" ;;
+      cyan) foreground="#7ed3c4" ;;
+      gray|grey) foreground="#a0a0a0" ;;
+      orange) foreground="#ff9f43" ;;
+      pink) foreground="#ff79c6" ;;
+      *)
+        hex="${requested#\#}"
+        if { [ "${#hex}" -ne 3 ] && [ "${#hex}" -ne 6 ]; } || [ -z "$hex" ]; then
+          printf '%s\n' 'Text color must be a named color, #RGB, #RRGGBB, or default.' >&2
+          exit 2
+        fi
+        case "$hex" in
+          *[!0-9A-Fa-f]*)
+            printf '%s\n' 'Text color must be a named color, #RGB, #RRGGBB, or default.' >&2
+            exit 2
+            ;;
+        esac
+        foreground="#${hex}"
+        ;;
+    esac
+    if [ "$requested" = "default" ] || [ "$requested" = "deafault" ]; then
+      message="Text restored to the original Veil default."
+    else
+      message="Text color set to ${foreground}."
+    fi
+    ;;
+  default|deafault)
+    if [ "$#" -eq 2 ] && [ "$requested" != "text" ]; then
+      usage
+      exit 2
+    fi
+    update_text="1"
+    update_typography="1"
+    foreground="$default_text"
+    font_family="$default_font_family"
+    font_size="$default_font_size"
+    font_weight="$default_font_weight"
+    if [ "$#" -eq 2 ]; then
+      message="Text restored to the original Veil default."
+    else
+      update_mode="1"
+      opacity="0"
+      blur="28"
+      clear_mode="false"
+      glass_mode="liquid"
+      message="Veil Liquid glass and text restored to defaults."
+    fi
+    ;;
+  mac)
+    if [ "$#" -ne 2 ] || [ "$requested" != "text" ]; then
+      usage
+      exit 2
+    fi
+    update_text="1"
+    update_typography="1"
+    foreground="$default_text"
+    font_family="$mac_font_family"
+    font_size="$mac_font_size"
+    font_weight="$mac_font_weight"
+    message="Text set to SF Mono Regular 11."
+    ;;
+  *)
+    usage
+    exit 2
+    ;;
+esac
+
+config_root="${XDG_CONFIG_HOME:-${HOME}/.config}"
+config_dir="${config_root}/veil"
+config_path="${config_dir}/config"
+mkdir -p "$config_dir"
+touch "$config_path"
+
+temporary="$(mktemp "${config_dir}/.config.XXXXXX")"
+trap 'rm -f "$temporary"' EXIT HUP INT TERM
+
+awk \
+  -v update_mode="$update_mode" \
+  -v update_text="$update_text" \
+  -v update_typography="$update_typography" \
+  -v opacity="$opacity" \
+  -v blur="$blur" \
+  -v clear_mode="$clear_mode" \
+  -v glass_mode="$glass_mode" \
+  -v foreground="$foreground" \
+  -v font_family="$font_family" \
+  -v font_size="$font_size" \
+  -v font_weight="$font_weight" '
+  BEGIN {
+    found_transparent = 0
+    found_opacity = 0
+    found_blur = 0
+    found_clear_mode = 0
+    found_glass_mode = 0
+    found_foreground = 0
+    found_font_family = 0
+    found_font_size = 0
+    found_font_weight = 0
+  }
+  /^[[:space:]]*transparent[[:space:]]*=/ && update_mode {
+    print "transparent = true"
+    found_transparent = 1
+    next
+  }
+  /^[[:space:]]*glass-opacity[[:space:]]*=/ && update_mode {
+    print "glass-opacity = " opacity
+    found_opacity = 1
+    next
+  }
+  /^[[:space:]]*glass-blur[[:space:]]*=/ && update_mode {
+    print "glass-blur = " blur
+    found_blur = 1
+    next
+  }
+  /^[[:space:]]*clear-mode[[:space:]]*=/ && update_mode {
+    print "clear-mode = " clear_mode
+    found_clear_mode = 1
+    next
+  }
+  /^[[:space:]]*glass-mode[[:space:]]*=/ && update_mode {
+    print "glass-mode = \"" glass_mode "\""
+    found_glass_mode = 1
+    next
+  }
+  /^[[:space:]]*foreground[[:space:]]*=/ && update_text {
+    print "foreground = \"" foreground "\""
+    found_foreground = 1
+    next
+  }
+  /^[[:space:]]*font-family[[:space:]]*=/ && update_typography {
+    print "font-family = \"" font_family "\""
+    found_font_family = 1
+    next
+  }
+  /^[[:space:]]*font-size[[:space:]]*=/ && update_typography {
+    print "font-size = " font_size
+    found_font_size = 1
+    next
+  }
+  /^[[:space:]]*font-weight[[:space:]]*=/ && update_typography {
+    print "font-weight = " font_weight
+    found_font_weight = 1
+    next
+  }
+  { print }
+  END {
+    if (update_mode && !found_transparent) print "transparent = true"
+    if (update_mode && !found_opacity) print "glass-opacity = " opacity
+    if (update_mode && !found_blur) print "glass-blur = " blur
+    if (update_mode && !found_clear_mode) print "clear-mode = " clear_mode
+    if (update_mode && !found_glass_mode) print "glass-mode = \"" glass_mode "\""
+    if (update_text && !found_foreground) print "foreground = \"" foreground "\""
+    if (update_typography && !found_font_family) print "font-family = \"" font_family "\""
+    if (update_typography && !found_font_size) print "font-size = " font_size
+    if (update_typography && !found_font_weight) print "font-weight = " font_weight
+  }
+' "$config_path" > "$temporary"
+
+cp "$temporary" "$config_path"
+printf '%s\n' "$message"
