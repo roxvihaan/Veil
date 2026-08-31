@@ -42,6 +42,7 @@ for (const dependency of ['node-pty', 'node-addon-api']) {
 await chmod(join(appRoot, 'bin/veil'), 0o755);
 run(process.execPath, [join(root, 'scripts/build-veil-image.mjs')]);
 run(process.execPath, [join(root, 'scripts/patch-veil-terminal-persistence.mjs')]);
+run(process.execPath, [join(root, 'scripts/patch-veil-background.mjs')]);
 await cp(join(root, 'assets/Info.plist'), join(target, 'Contents/Info.plist'));
 await cp(join(root, 'assets/veil.icns'), join(resources, 'electron.icns'));
 run('codesign', ['--force', '--deep', '--sign', '-', target]);

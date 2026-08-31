@@ -77,13 +77,29 @@ Veil shows the actual desktop and windows behind it. No wallpaper is bundled or 
 | `veil liquid 60` | The same blur plus a darker background tint. |
 | `veil clear default` | Restore Clear's default: 100% transparency, no blur. |
 | `veil liquid default` | Restore Liquid's default: 100% transparency and blur radius 28. |
-| `veil default` | Restore Liquid mode plus the original text color and typography. |
+| `veil default` | Restore Liquid mode, background tint, original text color and typography. |
 
 Both modes accept whole numbers **1–100**. Higher values are more transparent; the Liquid percentage changes tint opacity, not blur strength. Omitting the value means `default`. The spelling `deafault` is also accepted wherever `default` is accepted. Decimals and the old `veil trans` command are not supported.
 
-For a completely opaque window, set `transparent = false` in the config. A later `veil clear` or `veil liquid` command enables transparency again. `veil default` restores glass/text settings; it does not erase unrelated config entries such as your shell or padding.
+For a completely opaque window, set `transparent = false` in the config. A later `veil clear` or `veil liquid` command enables transparency again. `veil default` restores glass/background/text settings; it does not erase unrelated config entries such as your shell or padding.
 
 Liquid uses a small native module to blur behind the window. It relies on a private macOS window-server API; when that API is unavailable, Veil falls back to Electron vibrancy, which may have a different tint. This is Veil's blur mode, not a claim to implement Apple's system Liquid Glass material.
+
+### Background tint color
+
+```sh
+veil liquid 60
+veil bg color blue
+veil bg color '#241a36'
+veil bg color default
+veil bg color deafault
+```
+
+`veil bg color <color>` changes the background tint visible through Clear/Liquid's opacity control. It accepts the same named colors and three- or six-digit hex colors as `veil text`. It preserves the current transparency, blur, text color and font. The tint applies once across the window, not separately to each split.
+
+At **100% transparency** no tint is visible; lower the percentage (for example, `veil liquid 60` or `veil clear 60`) to see your color. This does not recolor the desktop or change the separate `transparent = false` opaque-window preset.
+
+`veil bg color default`, `veil bg color deafault`, or simply `veil bg color` restores the original dark tint, `#14171c`. The setting persists in config as `glass-color`. `veil default` also resets it; text-only and Clear/Liquid defaults leave the selected tint unchanged.
 
 ### Text colors and font presets
 
@@ -188,6 +204,7 @@ cursor-blink = true
 transparent = true
 glass-mode = "liquid"
 glass-opacity = 0
+glass-color = "#14171c"
 glass-blur = 28
 padding-x = 18
 padding-y = 16
@@ -211,6 +228,7 @@ native/veil_blur.mm                        Behind-window blur module
 Neofetch/neofetch                          Optional persistent-logo wrapper
 scripts/patch-veil-terminal-persistence.mjs Terminal sizing/lifecycle patch
 scripts/veil-split-sizing.css              Root-pane and split geometry
+scripts/patch-veil-background.mjs          Live background-color binding
 scripts/package-mac.mjs                    Standalone macOS packager
 assets/                                   App icon and Launch Services metadata
 tests/                                    Command, latency and geometry checks

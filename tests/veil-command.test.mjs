@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -83,6 +83,65 @@ test("veil commands provide defaults and live text colors", async () => {
     await assert.rejects(run("text", "not-a-color"), (error) => error.code === 2);
     await assert.rejects(run("default", "liquid"), (error) => error.code === 2);
     await assert.rejects(run("mac"), (error) => error.code === 2);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("background tint colors and defaults preserve opacity, text and unrelated config", async () => {
+  const root = await mkdtemp(join(tmpdir(), "veil-background-"));
+  const env = { ...process.env, XDG_CONFIG_HOME: root };
+  const configPath = join(root, "veil", "config");
+  const run = (...args) => runFile(veil, args, { env });
+  const config = () => readFile(configPath, "utf8");
+  const withoutTint = text => text.replace(/^\s*glass-color\s*=.*\n/gm, "");
+
+  try {
+    await run("liquid", "70");
+    await run("mac", "text");
+    await run("text", "cyan");
+    await writeFile(configPath, (await config()) + '# keep this comment\nshell = "/bin/zsh"\npadding-y = 23\n');
+    const original = await config();
+    for (const [input, expected] of [
+      ["blue", "#61afef"], ["black", "#000000"], ["pink", "#ff79c6"],
+      ["#aBc", "#aBc"], ["#ABC123", "#ABC123"], ["123abc", "#123abc"],
+      ["default", "#14171c"], ["deafault", "#14171c"],
+    ]) {
+      await run("bg", "color", input);
+      const current = await config();
+      assert.equal(value(current, "glass-color"), `"${expected}"`);
+      assert.equal(withoutTint(current), original, "tint must not alter other settings");
+      assert.equal(current.match(/^glass-color\s*=/gm).length, 1, "tint updates must not duplicate entries");
+    }
+    await run("bg", "color", "red");
+    await run("bg", "color");
+    assert.equal(value(await config(), "glass-color"), '"#14171c"');
+    await run("clear", "45");
+    const clear = withoutTint(await config());
+    await run("bg", "color", "purple");
+    assert.equal(withoutTint(await config()), clear, "Clear opacity/blur must also be preserved");
+
+    const beforeInvalid = await config();
+    for (const args of [[], ["bg"], ["bg", "red"], ["bg", "color", ""],
+      ["bg", "color", "not-a-color"], ["bg", "color", "#1234"], ["bg", "color", "#ggg"],
+      ["bg", "color", "#11223344"], ["bg", "color", "red", "extra"], ["text", "red", "extra"],
+      ["clear", "50", "extra"], ["liquid", "50", "extra"], ["default", "text", "extra"],
+    ]) {
+      await assert.rejects(run(...args), error => error.code === 2, JSON.stringify(args));
+      assert.equal(await config(), beforeInvalid, "invalid arguments must leave config untouched");
+    }
+    for (const args of [["default", "text"], ["text", "default"], ["mac", "text"], ["liquid", "default"], ["clear", "deafault"]]) {
+      await run(...args);
+      assert.equal(value(await config(), "glass-color"), '"#bd93f9"', "other presets must preserve tint");
+    }
+    for (const alias of ["default", "deafault"]) {
+      await run("bg", "color", "red");
+      await run(alias);
+      assert.equal(value(await config(), "glass-color"), '"#14171c"', "global default must reset tint");
+    }
+    await writeFile(configPath, (await config()) + '  glass-color = "#ffffff"\n');
+    await run("bg", "color", "black");
+    assert.equal((await config()).match(/^\s*glass-color\s*=/gm).length, 1);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

@@ -44,6 +44,7 @@ transparent = true
 clear-mode = false
 glass-mode = "liquid"
 glass-opacity = 0
+glass-color = "#14171c"
 glass-blur = 28
 panel-opacity = 0.28
 padding-x = 18

@@ -7,12 +7,14 @@ usage() {
     'Usage: veil clear [1-100|default]' \
     '       veil liquid [1-100|default]' \
     '       veil text [color|default]' \
+    '       veil bg color [color|default]' \
     '       veil default [text]' \
     '       veil mac text' \
     '       veil image <path>'
 }
 
 default_text="#eef3ea"
+default_glass_color="#14171c"
 default_font_family="JetBrains Mono, SFMono-Regular, Menlo, monospace"
 default_font_size="14"
 default_font_weight="450"
@@ -21,17 +23,20 @@ mac_font_size="11"
 mac_font_weight="400"
 update_mode="0"
 update_text="0"
+update_background="0"
 update_typography="0"
 opacity=""
 blur=""
 clear_mode=""
 glass_mode=""
 foreground=""
+glass_color=""
 font_family=""
 font_size=""
 font_weight=""
 
-if [ "$#" -lt 1 ] || [ "$#" -gt 2 ]; then
+# Only the background subcommand takes a third argument.
+if [ "$#" -lt 1 ] || [ "$#" -gt 3 ] || { [ "$#" -eq 3 ] && [ "$1" != "bg" ]; }; then
   usage
   exit 2
 fi
@@ -52,7 +57,54 @@ fi
 command="$1"
 requested="${2:-default}"
 
+# Text and background accept the same palette and hex syntax.
+parse_color() {
+  case "$1" in
+    black) color="#000000" ;;
+    white) color="#ffffff" ;;
+    red) color="#ff5f57" ;;
+    green|lime) color="#79f26f" ;;
+    yellow) color="#ffd866" ;;
+    blue) color="#61afef" ;;
+    magenta|purple) color="#bd93f9" ;;
+    cyan) color="#7ed3c4" ;;
+    gray|grey) color="#a0a0a0" ;;
+    orange) color="#ff9f43" ;;
+    pink) color="#ff79c6" ;;
+    *)
+      hex="${1#\#}"
+      if { [ "${#hex}" -ne 3 ] && [ "${#hex}" -ne 6 ]; }; then
+        return 1
+      fi
+      case "$hex" in *[!0-9A-Fa-f]*) return 1 ;; esac
+      color="#${hex}"
+      ;;
+  esac
+}
+
 case "$command" in
+  bg)
+    if [ "$#" -lt 2 ] || [ "$2" != "color" ]; then
+      usage
+      exit 2
+    fi
+    requested="${3-default}"
+    update_background="1"
+    case "$requested" in
+      default|deafault)
+        glass_color="$default_glass_color"
+        message="Background tint restored to default."
+        ;;
+      *)
+        if ! parse_color "$requested"; then
+          printf '%s\n' 'Background color must be a named color, #RGB, #RRGGBB, or default.' >&2
+          exit 2
+        fi
+        glass_color="$color"
+        message="Background tint set to ${glass_color}."
+        ;;
+    esac
+    ;;
   clear)
     update_mode="1"
     case "$requested" in
@@ -117,30 +169,12 @@ case "$command" in
         font_size="$default_font_size"
         font_weight="$default_font_weight"
         ;;
-      black) foreground="#000000" ;;
-      white) foreground="#ffffff" ;;
-      red) foreground="#ff5f57" ;;
-      green|lime) foreground="#79f26f" ;;
-      yellow) foreground="#ffd866" ;;
-      blue) foreground="#61afef" ;;
-      magenta|purple) foreground="#bd93f9" ;;
-      cyan) foreground="#7ed3c4" ;;
-      gray|grey) foreground="#a0a0a0" ;;
-      orange) foreground="#ff9f43" ;;
-      pink) foreground="#ff79c6" ;;
       *)
-        hex="${requested#\#}"
-        if { [ "${#hex}" -ne 3 ] && [ "${#hex}" -ne 6 ]; } || [ -z "$hex" ]; then
+        if ! parse_color "$requested"; then
           printf '%s\n' 'Text color must be a named color, #RGB, #RRGGBB, or default.' >&2
           exit 2
         fi
-        case "$hex" in
-          *[!0-9A-Fa-f]*)
-            printf '%s\n' 'Text color must be a named color, #RGB, #RRGGBB, or default.' >&2
-            exit 2
-            ;;
-        esac
-        foreground="#${hex}"
+        foreground="$color"
         ;;
     esac
     if [ "$requested" = "default" ] || [ "$requested" = "deafault" ]; then
@@ -164,11 +198,13 @@ case "$command" in
       message="Text restored to the original Veil default."
     else
       update_mode="1"
+      update_background="1"
+      glass_color="$default_glass_color"
       opacity="0"
       blur="28"
       clear_mode="false"
       glass_mode="liquid"
-      message="Veil Liquid glass and text restored to defaults."
+      message="Veil Liquid glass, background tint and text restored to defaults."
     fi
     ;;
   mac)
@@ -202,12 +238,14 @@ trap 'rm -f "$temporary"' EXIT HUP INT TERM
 awk \
   -v update_mode="$update_mode" \
   -v update_text="$update_text" \
+  -v update_background="$update_background" \
   -v update_typography="$update_typography" \
   -v opacity="$opacity" \
   -v blur="$blur" \
   -v clear_mode="$clear_mode" \
   -v glass_mode="$glass_mode" \
   -v foreground="$foreground" \
+  -v glass_color="$glass_color" \
   -v font_family="$font_family" \
   -v font_size="$font_size" \
   -v font_weight="$font_weight" '
@@ -218,6 +256,7 @@ awk \
     found_clear_mode = 0
     found_glass_mode = 0
     found_foreground = 0
+    found_glass_color = 0
     found_font_family = 0
     found_font_size = 0
     found_font_weight = 0
@@ -245,6 +284,11 @@ awk \
   /^[[:space:]]*glass-mode[[:space:]]*=/ && update_mode {
     print "glass-mode = \"" glass_mode "\""
     found_glass_mode = 1
+    next
+  }
+  /^[[:space:]]*glass-color[[:space:]]*=/ && update_background {
+    if (!found_glass_color) print "glass-color = \"" glass_color "\""
+    found_glass_color = 1
     next
   }
   /^[[:space:]]*foreground[[:space:]]*=/ && update_text {
@@ -275,6 +319,7 @@ awk \
     if (update_mode && !found_clear_mode) print "clear-mode = " clear_mode
     if (update_mode && !found_glass_mode) print "glass-mode = \"" glass_mode "\""
     if (update_text && !found_foreground) print "foreground = \"" foreground "\""
+    if (update_background && !found_glass_color) print "glass-color = \"" glass_color "\""
     if (update_typography && !found_font_family) print "font-family = \"" font_family "\""
     if (update_typography && !found_font_size) print "font-size = " font_size
     if (update_typography && !found_font_weight) print "font-weight = " font_weight

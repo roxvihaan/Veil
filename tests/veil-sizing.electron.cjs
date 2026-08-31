@@ -60,12 +60,38 @@ async function checkFit(label) {
   return panes;
 }
 
+async function checkTint(mode, color, opacity, rgb) {
+  win.webContents.send('config:changed', {'glass-mode':mode, 'glass-color':color, 'glass-opacity':opacity});
+  await settle();
+  const actual = await js(`(() => {
+    const surface = document.querySelector('.app-window');
+    const ctx = document.createElement('canvas').getContext('2d');
+    ctx.fillStyle = getComputedStyle(surface).backgroundColor;
+    ctx.fillRect(0, 0, 1, 1);
+    return Array.from(ctx.getImageData(0, 0, 1, 1).data);
+  })()`);
+  assert.ok(Math.abs(actual[3] - Math.round(opacity * 255)) <= 1, `${mode}: tint changed opacity (${actual})`);
+  if (opacity > 0) rgb.forEach((value, channel) => {
+    assert.ok(Math.abs(actual[channel] - value) <= 2, `${mode}: wrong tint (${actual})`);
+  });
+}
+
 app.whenReady().then(async () => {
   win = new BrowserWindow({ width:1120, height:720, show:false, backgroundColor:'#171a1e',
     webPreferences:{ preload:join(packaged, 'electron/preload.cjs'), backgroundThrottling:false } });
   try {
     await win.loadFile(join(packaged, 'dist/client/index.html'));
     await checkFit('startup');
+    for (const mode of ['clear', 'liquid']) {
+      await checkTint(mode, '#123456', 0.4, [18, 52, 86]);
+      await checkTint(mode, '#aBc', 0.6, [170, 187, 204]);
+      await checkTint(mode, '#14171c', 0.4, [20, 23, 28]);
+      await checkTint(mode, undefined, 0.4, [20, 23, 28]);
+      await checkTint(mode, 'invalid config color', 0.4, [20, 23, 28]);
+      await checkTint(mode, '#ffffff', 0, [0, 0, 0]);
+    }
+    assert.equal(serial, 1, 'appearance changes must not recreate sessions');
+    assert.equal(closed, 0);
     win.webContents.send('config:changed', {'font-family':'SFMono-Regular, SF Mono, Menlo, monospace', 'font-size':11, 'font-weight':400, 'line-height':1});
     const [small] = await checkFit('mac font without window resize');
     assert.equal(sessions.get('test-1').rows, small.rows, 'PTY must match renderer rows');
@@ -91,6 +117,13 @@ app.whenReady().then(async () => {
     assert.equal(splitPanes.length, 2);
     assert.equal(serial, 3, 'splitting must create only one additional shell');
     assert.equal(closed, 0, 'splitting must preserve existing sessions');
+    await checkTint('liquid', '#123456', 0.4, [18, 52, 86]);
+    assert.ok(await js(`Array.from(document.querySelectorAll('.pane-leaf, .terminal-pane, .xterm, .xterm-viewport')).every(el => {
+      const ctx = document.createElement('canvas').getContext('2d');
+      ctx.fillStyle = getComputedStyle(el).backgroundColor;
+      ctx.fillRect(0, 0, 1, 1);
+      return ctx.getImageData(0, 0, 1, 1).data[3] === 0;
+    })`), 'split backgrounds must stay transparent, without stacking tint');
     assert.ok(await js(`Array.from(document.querySelectorAll('.xterm-rows')).some(el=>el.textContent.includes('split-buffer-marker'))`), 'split must preserve existing text');
     win.setSize(950, 580);
     await checkFit('resized split');
@@ -102,7 +135,7 @@ app.whenReady().then(async () => {
     await settle();
     await js(`Array.from(document.querySelectorAll('.split-menu button')).find(b=>b.textContent==='Add tab right').click()`);
     assert.equal((await checkFit('horizontal split')).length, 2);
-    console.log('PASS: packaged terminal geometry, font changes, tab activation and split preservation');
+    console.log('PASS: live background colors, terminal geometry, font changes, tab activation and split preservation');
     app.exit(0);
   } catch (error) {
     console.error(error.stack);
