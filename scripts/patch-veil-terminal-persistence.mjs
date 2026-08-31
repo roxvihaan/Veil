@@ -114,6 +114,7 @@ function Zb({focused:t,config:s,paneId:n,onMeta:a}){
         entry.offExit?.();
         entry.inputDisposable?.dispose();
         entry.resizeDisposable?.dispose();
+        entry.appearanceDisposables?.forEach(disposable=>disposable.dispose());
         if(entry.id&&entry.id!=="demo")window.veil?.closeTerminal(entry.id);
         entry.terminal.dispose();
         paneTerminalCache.delete(n);
@@ -131,7 +132,28 @@ function Zb({focused:t,config:s,paneId:n,onMeta:a}){
     }
     terminal.options.cursorBlink=options.cursorBlink;
     terminal.options.cursorStyle=options.cursorStyle;
+    terminal.options.fontWeightBold=options.fontWeightBold;
+    terminal.options.drawBoldTextInBrightColors=options.drawBoldTextInBrightColors;
     terminal.options.theme=options.theme;
+    terminal.element?.classList.toggle("veil-no-antialias",s["text-antialias"]===false);
+    if(entry){
+      const parserSettings=[s["ansi-colors"],s["allow-blinking-text"],s["dynamic-foreground"]].join("|");
+      if(entry.parserSettings!==parserSettings){
+        entry.parserSettings=parserSettings;
+        entry.appearanceDisposables?.forEach(disposable=>disposable.dispose());
+        entry.appearanceDisposables=[];
+        terminal.write("\x1b[0m");
+        if(s["ansi-colors"]===false){
+          entry.appearanceDisposables.push(terminal.parser.registerCsiHandler({final:"m"},()=>true));
+        }else if(s["allow-blinking-text"]===false){
+          entry.appearanceDisposables.push(terminal.parser.registerCsiHandler({final:"m"},params=>Array.from(params.params||[]).includes(5)));
+        }
+        if(s["dynamic-foreground"]===false){
+          entry.appearanceDisposables.push(terminal.parser.registerOscHandler(10,()=>true));
+          entry.appearanceDisposables.push(terminal.parser.registerOscHandler(110,()=>true));
+        }
+      }
+    }
     if(entry&&entry.metrics!==metrics){entry.metrics=metrics;entry.requestFit?.()}
   },[s,n]);
   O.useEffect(()=>{

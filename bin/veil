@@ -4,50 +4,33 @@ set -eu
 
 usage() {
   printf '%s\n' \
-    'Usage: veil clear [1-100|default]' \
-    '       veil liquid [1-100|default]' \
-    '       veil text [color|default]' \
+    'Usage: veil clear|liquid [1-100|default]' \
     '       veil bg color [color|default]' \
+    '       veil font family <name>' \
+    '       veil font size <6-72>' \
+    '       veil font weight <100-900|normal|bold>' \
+    '       veil text [color|default]' \
+    '       veil text antialias|bold|blink|ansi|bright-bold <on|off>' \
+    '       veil bold text [color|default]' \
+    '       veil selection [color|default]' \
+    '       veil ansi normal|bright <black|red|green|yellow|blue|magenta|cyan|white> [color|default]' \
+    '       veil dynamic colors <on|off>' \
+    '       veil cursor style <block|underline|bar>' \
+    '       veil cursor blink <on|off>' \
+    '       veil cursor color [color|default]' \
+    '       veil profile create|save|use|delete <name>' \
+    '       veil profile <name>|list' \
     '       veil default [text]' \
     '       veil mac text' \
     '       veil image <path>'
 }
 
-default_text="#eef3ea"
-default_glass_color="#14171c"
-default_font_family="JetBrains Mono, SFMono-Regular, Menlo, monospace"
-default_font_size="14"
-default_font_weight="450"
-mac_font_family="SFMono-Regular, SF Mono, Menlo, monospace"
-mac_font_size="11"
-mac_font_weight="400"
-update_mode="0"
-update_text="0"
-update_background="0"
-update_typography="0"
-opacity=""
-blur=""
-clear_mode=""
-glass_mode=""
-foreground=""
-glass_color=""
-font_family=""
-font_size=""
-font_weight=""
+fail_usage() { usage >&2; exit 2; }
+[ "$#" -ge 1 ] || fail_usage
 
-# Only the background subcommand takes a third argument.
-if [ "$#" -lt 1 ] || [ "$#" -gt 3 ] || { [ "$#" -eq 3 ] && [ "$1" != "bg" ]; }; then
-  usage
-  exit 2
-fi
-
+# Image rendering stays independent from appearance configuration.
 if [ "$1" = "image" ]; then
-  if [ "$#" -ne 2 ]; then
-    usage
-    exit 2
-  fi
-  # Homebrew links this command into its bin directory. Follow the link back
-  # into the app so the native image helper is still found beside this script.
+  [ "$#" -eq 2 ] || fail_usage
   script_path="$0"
   link_count=0
   while [ -L "$script_path" ]; do
@@ -70,10 +53,38 @@ if [ "$1" = "image" ]; then
   exec "${script_dir}/veil-image" "$2"
 fi
 
-command="$1"
-requested="${2:-default}"
+config_root="${XDG_CONFIG_HOME:-${HOME}/.config}"
+config_dir="${config_root}/veil"
+config_path="${config_dir}/config"
+profiles_dir="${config_dir}/profiles"
+mkdir -p "$config_dir"
+touch "$config_path"
 
-# Text and background accept the same palette and hex syntax.
+default_text="#eef3ea"
+default_glass_color="#14171c"
+default_font_family="JetBrains Mono, SFMono-Regular, Menlo, monospace"
+default_font_size="14"
+default_font_weight="450"
+default_bold_weight="700"
+mac_font_family="SFMono-Regular, SF Mono, Menlo, monospace"
+
+default_black="#1d2422"
+default_red="#f08c86"
+default_green="#79f26f"
+default_yellow="#e8cb78"
+default_blue="#86aee8"
+default_magenta="#dba1e8"
+default_cyan="#7ed3c4"
+default_white="#eef3ea"
+default_bright_black="#68706c"
+default_bright_red="#f08c86"
+default_bright_green="#79f26f"
+default_bright_yellow="#e8cb78"
+default_bright_blue="#86aee8"
+default_bright_magenta="#dba1e8"
+default_bright_cyan="#7ed3c4"
+default_bright_white="#ffffff"
+
 parse_color() {
   case "$1" in
     black) color="#000000" ;;
@@ -89,258 +100,335 @@ parse_color() {
     pink) color="#ff79c6" ;;
     *)
       hex="${1#\#}"
-      if { [ "${#hex}" -ne 3 ] && [ "${#hex}" -ne 6 ]; }; then
-        return 1
-      fi
+      if { [ "${#hex}" -ne 3 ] && [ "${#hex}" -ne 6 ]; }; then return 1; fi
       case "$hex" in *[!0-9A-Fa-f]*) return 1 ;; esac
       color="#${hex}"
       ;;
   esac
 }
 
-case "$command" in
+parse_toggle() {
+  case "$1" in
+    on|true|yes|1) toggle="true" ;;
+    off|false|no|0) toggle="false" ;;
+    *) return 1 ;;
+  esac
+}
+
+validate_profile_name() {
+  case "$1" in ''|.*|*..*|*/*|*[!A-Za-z0-9._-]*) return 1 ;; esac
+  [ "${#1}" -le 64 ]
+}
+
+profile_command() {
+  action="${2:-list}"
+  case "$action" in
+    list)
+      [ "$#" -eq 2 ] || fail_usage
+      mkdir -p "$profiles_dir"
+      for path in "$profiles_dir"/*.config; do
+        [ -f "$path" ] || continue
+        basename "$path" .config
+      done | sort
+      exit 0
+      ;;
+    create|save|use|delete)
+      [ "$#" -eq 3 ] || fail_usage
+      name="$3"
+      ;;
+    *)
+      [ "$#" -eq 2 ] || fail_usage
+      action="use"
+      name="$2"
+      ;;
+  esac
+  if ! validate_profile_name "$name"; then
+    printf '%s\n' 'Profile names may use letters, numbers, dot, underscore and hyphen (64 characters max).' >&2
+    exit 2
+  fi
+  mkdir -p "$profiles_dir"
+  profile_path="${profiles_dir}/${name}.config"
+  case "$action" in
+    create)
+      if [ -e "$profile_path" ]; then printf 'Profile already exists: %s\n' "$name" >&2; exit 1; fi
+      temporary="$(mktemp "${profiles_dir}/.profile.XXXXXX")"
+      trap 'rm -f "$temporary"' EXIT HUP INT TERM
+      cp "$config_path" "$temporary"
+      mv "$temporary" "$profile_path"
+      trap - EXIT HUP INT TERM
+      printf 'Created profile %s.\n' "$name"
+      ;;
+    save)
+      temporary="$(mktemp "${profiles_dir}/.profile.XXXXXX")"
+      trap 'rm -f "$temporary"' EXIT HUP INT TERM
+      cp "$config_path" "$temporary"
+      mv "$temporary" "$profile_path"
+      trap - EXIT HUP INT TERM
+      printf 'Saved profile %s.\n' "$name"
+      ;;
+    use)
+      if [ ! -f "$profile_path" ]; then printf 'Profile not found: %s\n' "$name" >&2; exit 1; fi
+      temporary="$(mktemp "${config_dir}/.config.XXXXXX")"
+      trap 'rm -f "$temporary"' EXIT HUP INT TERM
+      cp "$profile_path" "$temporary"
+      cp "$temporary" "$config_path"
+      printf 'Loaded profile %s.\n' "$name"
+      ;;
+    delete)
+      if [ ! -f "$profile_path" ]; then printf 'Profile not found: %s\n' "$name" >&2; exit 1; fi
+      rm "$profile_path"
+      printf 'Deleted profile %s.\n' "$name"
+      ;;
+  esac
+  exit 0
+}
+
+if [ "$1" = "profile" ]; then profile_command "$@"; fi
+
+operations="$(mktemp "${config_dir}/.operations.XXXXXX")"
+temporary="$(mktemp "${config_dir}/.config.XXXXXX")"
+trap 'rm -f "$operations" "$temporary"' EXIT HUP INT TERM
+
+queue_raw() { printf '%s\t%s\n' "$1" "$2" >> "$operations"; }
+
+queue_string() {
+  case "$2" in *'
+'*) printf '%s\n' 'Values cannot contain newlines.' >&2; exit 2 ;; esac
+  escaped="$(printf '%s' "$2" | sed 's/\\/\\\\/g; s/"/\\"/g')"
+  queue_raw "$1" "\"${escaped}\""
+}
+
+queue_color() {
+  key="$1" requested="$2" fallback="$3"
+  case "$requested" in
+    default|deafault) queue_string "$key" "$fallback" ;;
+    *)
+      if ! parse_color "$requested"; then
+        alpha="${requested#\#}"
+        if [ "${4:-0}" != 1 ] || [ "${#alpha}" -ne 8 ]; then
+          printf '%s\n' 'Color must be named, #RGB, #RRGGBB, or default.' >&2
+          exit 2
+        fi
+        case "$alpha" in *[!0-9A-Fa-f]*) printf '%s\n' 'Color must be named, #RGB, #RRGGBB, or default.' >&2; exit 2 ;; esac
+        color="#${alpha}"
+      fi
+      queue_string "$key" "$color"
+      ;;
+  esac
+}
+
+queue_text_defaults() {
+  queue_string foreground "$default_text"
+  queue_string bold-foreground "$default_text"
+  queue_string font-family "$default_font_family"
+  queue_raw font-size "$default_font_size"
+  queue_raw font-weight "$default_font_weight"
+  queue_raw font-bold-weight "$default_bold_weight"
+}
+
+queue_all_defaults() {
+  queue_raw transparent true
+  queue_raw clear-mode false
+  queue_string glass-mode liquid
+  queue_raw glass-opacity 0
+  queue_string glass-color "$default_glass_color"
+  queue_raw glass-blur 28
+  queue_raw panel-opacity 0.28
+  queue_text_defaults
+  queue_raw line-height 1.18
+  queue_raw text-antialias true
+  queue_raw use-bold-font true
+  queue_raw allow-blinking-text true
+  queue_raw ansi-colors true
+  queue_raw bright-bold false
+  queue_raw dynamic-foreground true
+  queue_string background "#080c0c"
+  queue_string accent "#79f26f"
+  queue_string border "#c7826d"
+  queue_string selection "#5f745f88"
+  queue_string cursor-color "#79f26f"
+  queue_string cursor-style block
+  queue_raw cursor-blink true
+  queue_string black "$default_black"
+  queue_string red "$default_red"
+  queue_string green "$default_green"
+  queue_string yellow "$default_yellow"
+  queue_string blue "$default_blue"
+  queue_string magenta "$default_magenta"
+  queue_string cyan "$default_cyan"
+  queue_string white "$default_white"
+  queue_string bright-black "$default_bright_black"
+  queue_string bright-red "$default_bright_red"
+  queue_string bright-green "$default_bright_green"
+  queue_string bright-yellow "$default_bright_yellow"
+  queue_string bright-blue "$default_bright_blue"
+  queue_string bright-magenta "$default_bright_magenta"
+  queue_string bright-cyan "$default_bright_cyan"
+  queue_string bright-white "$default_bright_white"
+}
+
+case "$1" in
   bg)
-    if [ "$#" -lt 2 ] || [ "$2" != "color" ]; then
-      usage
-      exit 2
+    { [ "$#" -eq 2 ] || [ "$#" -eq 3 ]; } && [ "$2" = color ] || fail_usage
+    queue_color glass-color "${3-default}" "$default_glass_color"
+    message="Background tint updated."
+    ;;
+  clear|liquid)
+    [ "$#" -le 2 ] || fail_usage
+    requested="${2:-default}"
+    case "$requested" in
+      default|deafault) opacity=0 ;;
+      ''|*[!0-9]*) printf '%s\n' 'Transparency must be a whole number from 1 to 100, or default.' >&2; exit 2 ;;
+      *)
+        if ! awk -v value="$requested" 'BEGIN { exit value >= 1 && value <= 100 ? 0 : 1 }'; then
+          printf '%s\n' 'Transparency must be a whole number from 1 to 100, or default.' >&2; exit 2
+        fi
+        opacity="$(awk -v transparency="$requested" 'BEGIN { printf "%.3f", 1 - (transparency / 100) }')"
+        ;;
+    esac
+    queue_raw transparent true
+    queue_raw glass-opacity "$opacity"
+    if [ "$1" = clear ]; then
+      queue_raw clear-mode true; queue_string glass-mode clear; queue_raw glass-blur 0
+      message="Clear transparency updated."
+    else
+      queue_raw clear-mode false; queue_string glass-mode liquid; queue_raw glass-blur 28
+      message="Liquid transparency updated."
     fi
-    requested="${3-default}"
-    update_background="1"
-    case "$requested" in
-      default|deafault)
-        glass_color="$default_glass_color"
-        message="Background tint restored to default."
-        ;;
-      *)
-        if ! parse_color "$requested"; then
-          printf '%s\n' 'Background color must be a named color, #RGB, #RRGGBB, or default.' >&2
-          exit 2
-        fi
-        glass_color="$color"
-        message="Background tint set to ${glass_color}."
-        ;;
-    esac
     ;;
-  clear)
-    update_mode="1"
-    case "$requested" in
-      default|deafault)
-        opacity="0"
-        blur="0"
-        clear_mode="true"
-        glass_mode="clear"
-        message="Clear transparency restored to default (100%)."
-        ;;
-      ''|*[!0-9]*)
-        printf '%s\n' 'Clear transparency must be a whole number from 1 to 100, or default.' >&2
-        exit 2
-        ;;
-      *)
-        if ! awk -v value="$requested" 'BEGIN { exit value >= 1 && value <= 100 ? 0 : 1 }'; then
-          printf '%s\n' 'Clear transparency must be a whole number from 1 to 100, or default.' >&2
-          exit 2
+  font)
+    [ "$#" -eq 3 ] || fail_usage
+    case "$2" in
+      family) [ -n "$3" ] || fail_usage; queue_string font-family "$3"; message="Font family set to $3." ;;
+      size)
+        if ! awk -v value="$3" 'BEGIN { exit value ~ /^[0-9]+([.][0-9]+)?$/ && value >= 6 && value <= 72 ? 0 : 1 }'; then
+          printf '%s\n' 'Font size must be from 6 to 72.' >&2; exit 2
         fi
-        opacity="$(awk -v transparency="$requested" 'BEGIN { printf "%.3f", 1 - (transparency / 100) }')"
-        blur="0"
-        clear_mode="true"
-        glass_mode="clear"
-        message="Clear transparency set to ${requested}%."
+        queue_raw font-size "$3"; message="Font size set to $3."
         ;;
-    esac
-    ;;
-  liquid)
-    update_mode="1"
-    case "$requested" in
-      default|deafault)
-        opacity="0"
-        blur="28"
-        clear_mode="false"
-        glass_mode="liquid"
-        message="Liquid transparency restored to default (100%)."
+      weight)
+        case "$3" in
+          normal|bold) ;;
+          *[!0-9]*|'') printf '%s\n' 'Font weight must be normal, bold, or 100-900.' >&2; exit 2 ;;
+          *) [ "$3" -ge 100 ] && [ "$3" -le 900 ] || { printf '%s\n' 'Font weight must be normal, bold, or 100-900.' >&2; exit 2; } ;;
+        esac
+        queue_string font-weight "$3"; message="Font weight set to $3."
         ;;
-      ''|*[!0-9]*)
-        printf '%s\n' 'Liquid transparency must be a whole number from 1 to 100, or default.' >&2
-        exit 2
-        ;;
-      *)
-        if ! awk -v value="$requested" 'BEGIN { exit value >= 1 && value <= 100 ? 0 : 1 }'; then
-          printf '%s\n' 'Liquid transparency must be a whole number from 1 to 100, or default.' >&2
-          exit 2
-        fi
-        opacity="$(awk -v transparency="$requested" 'BEGIN { printf "%.3f", 1 - (transparency / 100) }')"
-        blur="28"
-        clear_mode="false"
-        glass_mode="liquid"
-        message="Liquid transparency set to ${requested}%."
-        ;;
+      *) fail_usage ;;
     esac
     ;;
   text)
-    update_text="1"
-    case "$requested" in
-      default|deafault)
-        foreground="$default_text"
-        update_typography="1"
-        font_family="$default_font_family"
-        font_size="$default_font_size"
-        font_weight="$default_font_weight"
-        ;;
-      *)
-        if ! parse_color "$requested"; then
-          printf '%s\n' 'Text color must be a named color, #RGB, #RRGGBB, or default.' >&2
-          exit 2
-        fi
-        foreground="$color"
-        ;;
-    esac
-    if [ "$requested" = "default" ] || [ "$requested" = "deafault" ]; then
-      message="Text restored to the original Veil default."
+    if [ "$#" -le 2 ]; then
+      queue_color foreground "${2:-default}" "$default_text"
+      case "${2:-default}" in default|deafault) queue_text_defaults ;; esac
+      message="Text color updated."
     else
-      message="Text color set to ${foreground}."
+      [ "$#" -eq 3 ] || fail_usage
+      if ! parse_toggle "$3"; then printf '%s\n' 'Text toggles accept on or off.' >&2; exit 2; fi
+      case "$2" in
+        antialias) key=text-antialias ;;
+        bold) key=use-bold-font ;;
+        blink) key=allow-blinking-text ;;
+        ansi) key=ansi-colors ;;
+        bright-bold) key=bright-bold ;;
+        *) fail_usage ;;
+      esac
+      queue_raw "$key" "$toggle"; message="Text $2 set to $toggle."
     fi
     ;;
+  bold)
+    { [ "$#" -eq 2 ] || [ "$#" -eq 3 ]; } && [ "$2" = text ] || fail_usage
+    queue_color bold-foreground "${3:-default}" "$default_text"; message="Bold text color updated."
+    ;;
+  selection)
+    [ "$#" -le 2 ] || fail_usage
+    queue_color selection "${2:-default}" "#5f745f88" 1; message="Selection color updated."
+    ;;
+  ansi)
+    [ "$#" -eq 4 ] || fail_usage
+    palette="$2" color_name="$3" requested="$4"
+    case "$color_name" in black|red|green|yellow|blue|magenta|cyan|white) ;; *) fail_usage ;; esac
+    case "$palette" in
+      normal) key="$color_name"; eval fallback="\$default_${color_name}" ;;
+      bright) key="bright-$color_name"; eval fallback="\$default_bright_${color_name}" ;;
+      *) fail_usage ;;
+    esac
+    queue_color "$key" "$requested" "$fallback"; message="ANSI $palette $color_name updated."
+    ;;
+  dynamic)
+    [ "$#" -eq 3 ] && [ "$2" = colors ] || fail_usage
+    if ! parse_toggle "$3"; then printf '%s\n' 'Dynamic colors accepts on or off.' >&2; exit 2; fi
+    queue_raw dynamic-foreground "$toggle"; message="Dynamic foreground colors set to $toggle."
+    ;;
+  cursor)
+    [ "$#" -le 3 ] || fail_usage
+    case "${2:-}" in
+      style)
+        [ "$#" -eq 3 ] || fail_usage
+        case "$3" in block|underline|bar) ;; *) printf '%s\n' 'Cursor style must be block, underline, or bar.' >&2; exit 2 ;; esac
+        queue_string cursor-style "$3"; message="Cursor style set to $3."
+        ;;
+      blink)
+        [ "$#" -eq 3 ] || fail_usage
+        if ! parse_toggle "$3"; then printf '%s\n' 'Cursor blink accepts on or off.' >&2; exit 2; fi
+        queue_raw cursor-blink "$toggle"; message="Cursor blink set to $toggle."
+        ;;
+      color)
+        { [ "$#" -eq 2 ] || [ "$#" -eq 3 ]; } || fail_usage
+        queue_color cursor-color "${3:-default}" "#79f26f"; message="Cursor color updated."
+        ;;
+      *) fail_usage ;;
+    esac
+    ;;
   default|deafault)
-    if [ "$#" -eq 2 ] && [ "$requested" != "text" ]; then
-      usage
-      exit 2
-    fi
-    update_text="1"
-    update_typography="1"
-    foreground="$default_text"
-    font_family="$default_font_family"
-    font_size="$default_font_size"
-    font_weight="$default_font_weight"
+    [ "$#" -le 2 ] || fail_usage
     if [ "$#" -eq 2 ]; then
-      message="Text restored to the original Veil default."
+      [ "$2" = text ] || fail_usage
+      queue_text_defaults; message="Text restored to the original Veil default."
     else
-      update_mode="1"
-      update_background="1"
-      glass_color="$default_glass_color"
-      opacity="0"
-      blur="28"
-      clear_mode="false"
-      glass_mode="liquid"
-      message="Veil Liquid glass, background tint and text restored to defaults."
+      queue_all_defaults; message="Every Veil appearance setting restored to default."
     fi
     ;;
   mac)
-    if [ "$#" -ne 2 ] || [ "$requested" != "text" ]; then
-      usage
-      exit 2
-    fi
-    update_text="1"
-    update_typography="1"
-    foreground="$default_text"
-    font_family="$mac_font_family"
-    font_size="$mac_font_size"
-    font_weight="$mac_font_weight"
+    [ "$#" -eq 2 ] && [ "$2" = text ] || fail_usage
+    queue_string foreground "$default_text"
+    queue_string bold-foreground "$default_text"
+    queue_string font-family "$mac_font_family"
+    queue_raw font-size 11
+    queue_raw font-weight 400
+    queue_raw font-bold-weight 700
     message="Text set to SF Mono Regular 11."
     ;;
-  *)
-    usage
-    exit 2
-    ;;
+  *) fail_usage ;;
 esac
 
-config_root="${XDG_CONFIG_HOME:-${HOME}/.config}"
-config_dir="${config_root}/veil"
-config_path="${config_dir}/config"
-mkdir -p "$config_dir"
-touch "$config_path"
-
-temporary="$(mktemp "${config_dir}/.config.XXXXXX")"
-trap 'rm -f "$temporary"' EXIT HUP INT TERM
-
-awk \
-  -v update_mode="$update_mode" \
-  -v update_text="$update_text" \
-  -v update_background="$update_background" \
-  -v update_typography="$update_typography" \
-  -v opacity="$opacity" \
-  -v blur="$blur" \
-  -v clear_mode="$clear_mode" \
-  -v glass_mode="$glass_mode" \
-  -v foreground="$foreground" \
-  -v glass_color="$glass_color" \
-  -v font_family="$font_family" \
-  -v font_size="$font_size" \
-  -v font_weight="$font_weight" '
-  BEGIN {
-    found_transparent = 0
-    found_opacity = 0
-    found_blur = 0
-    found_clear_mode = 0
-    found_glass_mode = 0
-    found_foreground = 0
-    found_glass_color = 0
-    found_font_family = 0
-    found_font_size = 0
-    found_font_weight = 0
+# Apply each command with one rewrite, collapsing duplicate keys. This avoids
+# exposing half-applied resets and profile changes to the live renderer.
+awk -F '\t' '
+  NR == FNR { values[$1] = $2; order[++count] = $1; next }
+  {
+    line = $0
+    key = line
+    sub(/^[[:space:]]*/, "", key)
+    sub(/[[:space:]]*=.*/, "", key)
+    if (key in values) {
+      if (!(key in seen)) {
+        print key " = " values[key]
+        seen[key] = 1
+      }
+      next
+    }
+    print line
   }
-  /^[[:space:]]*transparent[[:space:]]*=/ && update_mode {
-    print "transparent = true"
-    found_transparent = 1
-    next
-  }
-  /^[[:space:]]*glass-opacity[[:space:]]*=/ && update_mode {
-    print "glass-opacity = " opacity
-    found_opacity = 1
-    next
-  }
-  /^[[:space:]]*glass-blur[[:space:]]*=/ && update_mode {
-    print "glass-blur = " blur
-    found_blur = 1
-    next
-  }
-  /^[[:space:]]*clear-mode[[:space:]]*=/ && update_mode {
-    print "clear-mode = " clear_mode
-    found_clear_mode = 1
-    next
-  }
-  /^[[:space:]]*glass-mode[[:space:]]*=/ && update_mode {
-    print "glass-mode = \"" glass_mode "\""
-    found_glass_mode = 1
-    next
-  }
-  /^[[:space:]]*glass-color[[:space:]]*=/ && update_background {
-    if (!found_glass_color) print "glass-color = \"" glass_color "\""
-    found_glass_color = 1
-    next
-  }
-  /^[[:space:]]*foreground[[:space:]]*=/ && update_text {
-    print "foreground = \"" foreground "\""
-    found_foreground = 1
-    next
-  }
-  /^[[:space:]]*font-family[[:space:]]*=/ && update_typography {
-    print "font-family = \"" font_family "\""
-    found_font_family = 1
-    next
-  }
-  /^[[:space:]]*font-size[[:space:]]*=/ && update_typography {
-    print "font-size = " font_size
-    found_font_size = 1
-    next
-  }
-  /^[[:space:]]*font-weight[[:space:]]*=/ && update_typography {
-    print "font-weight = " font_weight
-    found_font_weight = 1
-    next
-  }
-  { print }
   END {
-    if (update_mode && !found_transparent) print "transparent = true"
-    if (update_mode && !found_opacity) print "glass-opacity = " opacity
-    if (update_mode && !found_blur) print "glass-blur = " blur
-    if (update_mode && !found_clear_mode) print "clear-mode = " clear_mode
-    if (update_mode && !found_glass_mode) print "glass-mode = \"" glass_mode "\""
-    if (update_text && !found_foreground) print "foreground = \"" foreground "\""
-    if (update_background && !found_glass_color) print "glass-color = \"" glass_color "\""
-    if (update_typography && !found_font_family) print "font-family = \"" font_family "\""
-    if (update_typography && !found_font_size) print "font-size = " font_size
-    if (update_typography && !found_font_weight) print "font-weight = " font_weight
+    for (position = 1; position <= count; position++) {
+      key = order[position]
+      if (!(key in seen)) {
+        print key " = " values[key]
+        seen[key] = 1
+      }
+    }
   }
-' "$config_path" > "$temporary"
-
+' "$operations" "$config_path" > "$temporary"
 cp "$temporary" "$config_path"
 printf '%s\n' "$message"

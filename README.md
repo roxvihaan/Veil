@@ -107,11 +107,11 @@ Veil shows the actual desktop and windows behind it. No wallpaper is bundled or 
 | `veil liquid 60` | The same blur plus a darker background tint. |
 | `veil clear default` | Restore Clear's default: 100% transparency, no blur. |
 | `veil liquid default` | Restore Liquid's default: 100% transparency and blur radius 28. |
-| `veil default` | Restore Liquid mode, background tint, original text color and typography. |
+| `veil default` | Restore every command-controlled appearance setting. |
 
 Both modes accept whole numbers **1–100**. Higher values are more transparent; the Liquid percentage changes tint opacity, not blur strength. Omitting the value means `default`. The spelling `deafault` is also accepted wherever `default` is accepted. Decimals and the old `veil trans` command are not supported.
 
-For a completely opaque window, set `transparent = false` in the config. A later `veil clear` or `veil liquid` command enables transparency again. `veil default` restores glass/background/text settings; it does not erase unrelated config entries such as your shell or padding.
+For a completely opaque window, set `transparent = false` in the config. A later `veil clear` or `veil liquid` command enables transparency again. `veil default` and `veil deafault` restore all appearance controls described below in one update; unrelated operational entries such as your shell and padding are preserved.
 
 Liquid uses a small native module to blur behind the window. It relies on a private macOS window-server API; when that API is unavailable, Veil falls back to Electron vibrancy, which may have a different tint. This is Veil's blur mode, not a claim to implement Apple's system Liquid Glass material.
 
@@ -149,6 +149,50 @@ veil default text
 - Fonts must be available on your Mac; otherwise the configured fallback fonts are used.
 
 Font and padding changes refit the terminal grid and update the shell's row/column count. The root pane fills the window instead of remaining at xterm's initial 24 rows.
+
+### Command-only appearance controls
+
+Veil has no settings panel and no background-image preference. All appearance controls are live `veil` commands:
+
+| Setting | Command |
+| --- | --- |
+| Font family | `veil font family 'SF Mono'` |
+| Font size | `veil font size 13` |
+| Font weight | `veil font weight 500` |
+| Antialias text | `veil text antialias on` / `off` |
+| Use bold font faces | `veil text bold on` / `off` |
+| Allow blinking text | `veil text blink on` / `off` |
+| Display ANSI colors | `veil text ansi on` / `off` |
+| Bright colors for bold ANSI text | `veil text bright-bold on` / `off` |
+| Dynamic foreground colors (OSC 10) | `veil dynamic colors on` / `off` |
+| Text color | `veil text cyan` |
+| Bold text color | `veil bold text '#ffffff'` |
+| Selection color | `veil selection '#5f745f88'` |
+| Normal ANSI color | `veil ansi normal red '#ff5f57'` |
+| Bright ANSI color | `veil ansi bright red '#ff6b63'` |
+| Cursor shape | `veil cursor style block`, `underline` or `bar` |
+| Cursor blink | `veil cursor blink on` / `off` |
+| Cursor color | `veil cursor color '#79f26f'` |
+
+Color commands accept the named colors above or hex. Selection also accepts `#RRGGBBAA` for translucency. Use `default` or the accepted `deafault` alias in any color command to restore that color. Disabling ANSI colors or blinking text affects newly received terminal output; it does not rewrite lines already in scrollback.
+
+`veil default` is the full reset: Liquid at 100%, the original tint, JetBrains Mono 14/450, all normal and bright ANSI colors, text rendering switches, selection, and block cursor are restored together. `veil default text` remains the narrower original-text reset.
+
+### Profiles
+
+Profiles are named snapshots of the current config, stored locally under `~/.config/veil/profiles/`:
+
+```sh
+veil profile create work
+veil profile create 1
+veil profile work
+veil profile use 1
+veil profile save work
+veil profile list
+veil profile delete work
+```
+
+`create` refuses to overwrite an existing profile; `save` deliberately updates it. `veil profile <name>` is the short form of `veil profile use <name>`. Loading a profile replaces the active config in one write so open panes update together without being recreated.
 
 ### Tabs, splits and window controls
 
@@ -228,9 +272,17 @@ Example entries:
 font-family = "JetBrains Mono, SFMono-Regular, Menlo, monospace"
 font-size = 14
 font-weight = 450
+font-bold-weight = 700
 line-height = 1.18
+text-antialias = true
+use-bold-font = true
+allow-blinking-text = true
+ansi-colors = true
+bright-bold = false
+dynamic-foreground = true
 cursor-style = "block"
 cursor-blink = true
+cursor-color = "#79f26f"
 transparent = true
 glass-mode = "liquid"
 glass-opacity = 0
@@ -239,9 +291,10 @@ glass-blur = 28
 padding-x = 18
 padding-y = 16
 foreground = "#eef3ea"
+bold-foreground = "#eef3ea"
 ```
 
-`glass-opacity` is the inverse of the command's transparency percentage: `0` is no tint and `1` is opaque tint. The `shell` setting affects newly created sessions. Other appearance options include `background`, `accent`, `border`, `selection` and the ANSI color keys `black`, `red`, `green`, `yellow`, `blue`, `magenta`, `cyan` and `white`.
+`glass-opacity` is the inverse of the command's transparency percentage: `0` is no tint and `1` is opaque tint. The `shell` setting affects newly created sessions. Other appearance options include `background`, `accent`, `border`, `selection`, the eight normal ANSI color keys and the corresponding `bright-black` through `bright-white` keys.
 
 Save the file to reload appearance. The `veil` commands write the corresponding config entries while keeping unrelated settings. The Neofetch extension also honors `XDG_CONFIG_HOME`.
 

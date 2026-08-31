@@ -14,3 +14,12 @@
   height: 100%;
   padding: var(--terminal-pad-y) var(--terminal-pad-x);
 }
+
+.terminal-pane .veil-no-antialias {
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+}
+
+.terminal-pane .xterm-bold:not([class*="xterm-fg-"]):not([style*="color"]) {
+  color: var(--veil-bold-foreground) !important;
+}

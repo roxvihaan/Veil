@@ -82,6 +82,54 @@ app.whenReady().then(async () => {
   try {
     await win.loadFile(join(packaged, 'dist/client/index.html'));
     await checkFit('startup');
+    win.webContents.send('config:changed', {
+      'text-antialias':false, 'use-bold-font':false, 'allow-blinking-text':false,
+      'ansi-colors':false, 'bright-bold':true, 'dynamic-foreground':false,
+      'bold-foreground':'#ff0000', 'cursor-style':'bar', 'cursor-blink':false,
+      'cursor-color':'#123456', selection:'#22334488', red:'#654321', 'bright-red':'#abcdef',
+    });
+    await settle();
+    win.webContents.send('terminal:data', {id:'test-1', data:'\x1b[31;5mANSI-OFF-PROBE\x1b[0m'});
+    await settle();
+    const disabledAppearance = await js(`(() => {
+      const terminal=document.querySelector('.xterm');
+      const probe=Array.from(document.querySelectorAll('.xterm-rows span')).find(span=>span.textContent.includes('ANSI-OFF-PROBE'));
+      return {antialias:terminal.classList.contains('veil-no-antialias'), probeClass:probe?.className||'',
+        bold:getComputedStyle(document.querySelector('.app-window')).getPropertyValue('--veil-bold-foreground').trim()};
+    })()`);
+    assert.equal(disabledAppearance.antialias, true, 'antialias toggle must reach the terminal');
+    assert.equal(disabledAppearance.bold, '#ff0000', 'bold text color must bind live');
+    assert.doesNotMatch(disabledAppearance.probeClass, /xterm-fg-|xterm-cursor-blink/, 'disabled ANSI/blink must be suppressed');
+    win.webContents.send('config:changed', {
+      'text-antialias':true, 'use-bold-font':true, 'allow-blinking-text':true,
+      'ansi-colors':true, 'bright-bold':false, 'dynamic-foreground':true,
+      'bold-foreground':'#ff0000', 'cursor-style':'bar', 'cursor-blink':false,
+      'cursor-color':'#123456', selection:'#22334488', red:'#654321', 'bright-red':'#abcdef',
+    });
+    await settle();
+    win.webContents.send('terminal:data', {id:'test-1', data:'\r\n\x1b[1mBOLD-PROBE\x1b[0m \x1b[31mRED-PROBE\x1b[0m'});
+    await settle();
+    const enabledAppearance = await js(`(() => {
+      const spans=Array.from(document.querySelectorAll('.xterm-rows span'));
+      const bold=spans.find(span=>span.textContent.includes('BOLD-PROBE'));
+      const red=spans.find(span=>span.textContent.includes('RED-PROBE'));
+      return {antialias:document.querySelector('.xterm').classList.contains('veil-no-antialias'),
+        boldColor:bold&&getComputedStyle(bold).color, redColor:red&&getComputedStyle(red).color};
+    })()`);
+    assert.equal(enabledAppearance.antialias, false);
+    assert.equal(enabledAppearance.boldColor, 'rgb(255, 0, 0)');
+    assert.equal(enabledAppearance.redColor, 'rgb(101, 67, 33)');
+    win.webContents.send('config:changed', {
+      'ansi-colors':true, 'bright-bold':true, 'bold-foreground':'#ff0000',
+      red:'#654321', 'bright-red':'#abcdef',
+    });
+    await settle();
+    win.webContents.send('terminal:data', {id:'test-1', data:'\r\n\x1b[1;31mBRIGHT-BOLD-PROBE\x1b[0m'});
+    await settle();
+    assert.equal(await js(`(() => {
+      const probe=Array.from(document.querySelectorAll('.xterm-rows span')).find(span=>span.textContent.includes('BRIGHT-BOLD-PROBE'));
+      return probe&&getComputedStyle(probe).color;
+    })()`), 'rgb(171, 205, 239)', 'bright-bold must use the independent bright ANSI palette');
     for (const mode of ['clear', 'liquid']) {
       await checkTint(mode, '#123456', 0.4, [18, 52, 86]);
       await checkTint(mode, '#aBc', 0.6, [170, 187, 204]);

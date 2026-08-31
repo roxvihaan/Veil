@@ -147,6 +147,94 @@ test("background tint colors and defaults preserve opacity, text and unrelated c
   }
 });
 
+test("command-only appearance settings, complete defaults and profiles", async () => {
+  const root = await mkdtemp(join(tmpdir(), "veil-appearance-"));
+  const env = { ...process.env, XDG_CONFIG_HOME: root };
+  const configPath = join(root, "veil", "config");
+  const run = (...args) => runFile(veil, args, { env });
+  const config = () => readFile(configPath, "utf8");
+
+  try {
+    await run("default");
+    await run("font", "family", "SF Mono");
+    await run("font", "size", "16.5");
+    await run("font", "weight", "600");
+    await run("text", "antialias", "off");
+    await run("text", "bold", "off");
+    await run("text", "blink", "off");
+    await run("text", "ansi", "off");
+    await run("text", "bright-bold", "on");
+    await run("dynamic", "colors", "off");
+    await run("bold", "text", "orange");
+    await run("selection", "#12345678");
+    await run("cursor", "style", "bar");
+    await run("cursor", "blink", "off");
+    await run("cursor", "color", "pink");
+    await run("ansi", "normal", "red", "#112233");
+    await run("ansi", "bright", "cyan", "#abcdef");
+
+    let current = await config();
+    const expected = {
+      "font-family": '"SF Mono"', "font-size": "16.5", "font-weight": '"600"',
+      "text-antialias": "false", "use-bold-font": "false", "allow-blinking-text": "false",
+      "ansi-colors": "false", "bright-bold": "true", "dynamic-foreground": "false",
+      "bold-foreground": '"#ff9f43"', selection: '"#12345678"',
+      "cursor-style": '"bar"', "cursor-blink": "false", "cursor-color": '"#ff79c6"',
+      red: '"#112233"', "bright-cyan": '"#abcdef"',
+    };
+    for (const [key, expectedValue] of Object.entries(expected)) {
+      assert.equal(value(current, key), expectedValue, key);
+      assert.equal(current.match(new RegExp(`^${key}\\s*=`, "gm")).length, 1, `${key} must not duplicate`);
+    }
+    for (const palette of ["normal", "bright"]) {
+      for (const name of ["black", "red", "green", "yellow", "blue", "magenta", "cyan", "white"]) {
+        await run("ansi", palette, name, "#102030");
+        const key = palette === "bright" ? `bright-${name}` : name;
+        assert.equal(value(await config(), key), '"#102030"', `${palette} ${name}`);
+      }
+    }
+
+    await writeFile(configPath, `${current}# profile marker\nshell = "/bin/zsh"\n`);
+    await run("profile", "create", "work");
+    await run("text", "blue");
+    assert.equal(value(await config(), "foreground"), '"#61afef"');
+    await run("profile", "work");
+    current = await config();
+    assert.equal(value(current, "foreground"), '"#eef3ea"');
+    assert.match(current, /# profile marker/);
+    assert.match((await run("profile", "list")).stdout, /^work$/m);
+    await assert.rejects(run("profile", "create", "work"), error => error.code === 1);
+    await assert.rejects(run("profile", "../bad"), error => error.code === 2);
+
+    await run("deafault");
+    current = await config();
+    const defaults = {
+      "font-family": '"JetBrains Mono, SFMono-Regular, Menlo, monospace"',
+      "font-size": "14", "font-weight": "450", "font-bold-weight": "700",
+      "text-antialias": "true", "use-bold-font": "true", "allow-blinking-text": "true",
+      "ansi-colors": "true", "bright-bold": "false", "dynamic-foreground": "true",
+      foreground: '"#eef3ea"', "bold-foreground": '"#eef3ea"', selection: '"#5f745f88"',
+      "cursor-style": '"block"', "cursor-blink": "true", "cursor-color": '"#79f26f"',
+      "glass-mode": '"liquid"', "glass-opacity": "0", "glass-blur": "28",
+      "glass-color": '"#14171c"', "bright-black": '"#68706c"', "bright-white": '"#ffffff"',
+      black: '"#1d2422"', red: '"#f08c86"', green: '"#79f26f"', yellow: '"#e8cb78"',
+      blue: '"#86aee8"', magenta: '"#dba1e8"', cyan: '"#7ed3c4"', white: '"#eef3ea"',
+      "bright-red": '"#f08c86"', "bright-green": '"#79f26f"', "bright-yellow": '"#e8cb78"',
+      "bright-blue": '"#86aee8"', "bright-magenta": '"#dba1e8"', "bright-cyan": '"#7ed3c4"',
+    };
+    for (const [key, expectedValue] of Object.entries(defaults)) assert.equal(value(current, key), expectedValue, key);
+    assert.equal(value(current, "shell"), '"/bin/zsh"', "full appearance reset preserves the shell");
+
+    for (const args of [
+      ["font", "size", "4"], ["font", "weight", "1000"], ["text", "ansi", "maybe"],
+      ["cursor", "style", "beam"], ["cursor", "blink", "maybe"],
+      ["ansi", "normal", "orange", "red"], ["ansi", "normal", "red", "#12345678"],
+    ]) await assert.rejects(run(...args), error => error.code === 2, JSON.stringify(args));
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("veil image renders native macOS image formats as terminal ASCII", async () => {
   const { stdout } = await runFile(veil, ["image", sampleImage], {
     env: { ...process.env, COLUMNS: "48", LINES: "24" },
