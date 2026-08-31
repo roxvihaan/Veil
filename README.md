@@ -12,9 +12,9 @@ Veil uses an Electron macOS window, xterm.js and real pseudo-terminal sessions. 
 
 Open [Releases](https://github.com/roxvihaan/Veil/releases) and download the `.dmg` under **Assets** for the version you want.
 
-Download [Veil 0.1.0 for Apple Silicon](https://github.com/roxvihaan/Veil/releases/download/v0.1.0/Veil-0.1.0-arm64.dmg), open it, then drag **Veil Terminal** onto **Applications**. Eject the disk image and launch Veil from Applications. No Node.js, npm or compiler is needed for the downloaded app.
+Download [Veil 0.1.1 for Apple Silicon](https://github.com/roxvihaan/Veil/releases/download/v0.1.1/Veil-0.1.1-arm64.dmg). It opens a large installer window with two big icons, an arrow, and **Drag Veil to Applications** instructions. Drag the Veil icon onto the Applications folder, eject the disk image, then launch Veil from Applications. No Node.js, npm or compiler is needed for the downloaded app.
 
-This release is **Apple Silicon only** (M1 or newer), targets macOS 12 or newer, and has been tested on macOS 26.5.1. Intel is not included. The [release page](https://github.com/roxvihaan/Veil/releases/tag/v0.1.0) also includes a SHA-256 checksum file.
+This release is **Apple Silicon only** (M1 or newer), targets macOS 12 or newer, and has been tested on macOS 26.5.1. Intel is not included. The [release page](https://github.com/roxvihaan/Veil/releases/tag/v0.1.1) also includes a SHA-256 checksum file.
 
 **First-launch security:** this release is ad-hoc signed, not Developer ID notarized. macOS may block the initial launch. Only if you trust this source, follow [Apple's instructions for approving an unnotarized app](https://support.apple.com/en-us/102445) in System Settings → Privacy & Security → Open Anyway after attempting to open it. Do not disable Gatekeeper or remove quarantine globally. This distribution does not change your security settings.
 
@@ -261,6 +261,8 @@ scripts/veil-split-sizing.css              Root-pane and split geometry
 scripts/patch-veil-background.mjs          Live background-color binding
 scripts/package-mac.mjs                    Standalone macOS packager
 scripts/package-dmg.mjs                    Versioned drag-to-install disk image
+scripts/dmg-settings.py                    Finder window and icon positions
+native/dmg_background.m                    Retina installer artwork
 assets/                                   App icon and Launch Services metadata
 tests/                                    Command, latency and geometry checks
 ```
@@ -294,9 +296,11 @@ npm test
 npm run test:dmg
 ```
 
-This builds an Apple Silicon app and creates `release/Veil-<version>-arm64.dmg` plus its `.sha256` file. The DMG contains only the app and an Applications shortcut; third-party license notices are inside the app's Resources directory. App versions are synchronized from `package.json`. The native modules target macOS 12 rather than silently inheriting the build machine's newer deployment target.
+DMG creation additionally requires Python 3.10 or newer with `venv` and `pip`. The script installs pinned `dmgbuild` dependencies into the project-local `.cache/dmg-venv`; it does not alter your system Python. The first DMG build needs network access for these dependencies.
 
-`test:dmg` mounts the image read-only, verifies the app signature, version, notices, shortcut, native deployment target and image renderer, and then ejects it. Existing user sessions and installed apps are untouched. The packager refuses to overwrite a versioned DMG; use a new version for a new release. See [the maintainer release guide](docs/releases.md) for GitHub and Homebrew publishing.
+This builds an Apple Silicon app and creates `release/Veil-<version>-arm64.dmg` plus its `.sha256` file. The installer uses a 760×480 Finder window, 144-point draggable icons, a Retina-ready background with instructions and an arrow, and no sidebar/toolbar clutter. Only the app and Applications shortcut are visible; Finder metadata and artwork are hidden. Third-party license notices are inside the app's Resources directory. App versions are synchronized from `package.json`. The native modules target macOS 12 rather than silently inheriting the build machine's newer deployment target.
+
+`test:dmg` mounts the image read-only, verifies the Finder layout, Retina artwork, app signature, version, notices, shortcut, native deployment target and image renderer, and then ejects it. Existing user sessions and installed apps are untouched. The packager refuses to overwrite a versioned DMG; use a new version for a new release. See [the maintainer release guide](docs/releases.md) for GitHub and Homebrew publishing.
 
 ## Troubleshooting
 

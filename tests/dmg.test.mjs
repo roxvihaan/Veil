@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { mkdtemp, readFile, readlink, rm, access } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, readlink, rm, access } from 'node:fs/promises';
 import { createReadStream } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { join, resolve } from 'node:path';
@@ -19,9 +19,13 @@ test('DMG checksum, Applications shortcut, signed app and image helper survive p
   for await (const chunk of createReadStream(dmg)) hash.update(chunk);
   assert.equal(await readFile(`${dmg}.sha256`, 'utf8'), `${hash.digest('hex')}  ${filename}\n`);
   await run('hdiutil', ['verify', dmg]);
-  const mount = await mkdtemp(join(tmpdir(), 'veil-dmg-test-'));
+  const scratch = await mkdtemp(join(tmpdir(), 'veil-dmg-test-'));
+  const mount = join(scratch, 'volume');
+  await mkdir(mount);
   let attached = false;
   try {
+    const artworkTest = join(scratch, 'check-artwork');
+    await run('xcrun', ['clang', '-framework', 'AppKit', join(root, 'tests/dmg-background.m'), '-o', artworkTest]);
     await run('hdiutil', ['attach', '-readonly', '-nobrowse', '-noautoopen', '-mountpoint', mount, dmg]);
     attached = true;
     assert.equal(await readlink(join(mount, 'Applications')), '/Applications');
@@ -32,6 +36,8 @@ test('DMG checksum, Applications shortcut, signed app and image helper survive p
     assert.match(retina, /Image Width: 760 Image Length: 480/);
     assert.match(retina, /Image Width: 1520 Image Length: 960/);
     assert.match(retina, /Resolution: 144, 144/);
+    const { stdout: pixels } = await run(artworkTest, [join(mount, '.background.tiff')]);
+    console.log(pixels.trim());
     const bundle = join(mount, 'Veil Terminal.app');
     await run('codesign', ['--verify', '--deep', '--strict', bundle]);
     const plist = join(bundle, 'Contents/Info.plist');
@@ -48,6 +54,6 @@ test('DMG checksum, Applications shortcut, signed app and image helper survive p
   } finally {
     // Never recurse into a mounted image if detach fails.
     if (attached) await run('hdiutil', ['detach', mount]);
-    await rm(mount, { recursive:true, force:true });
+    await rm(scratch, { recursive:true, force:true });
   }
 });

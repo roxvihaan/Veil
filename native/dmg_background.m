@@ -14,7 +14,6 @@ static NSBitmapImageRep *Render(CGFloat scale) {
   NSBitmapImageRep *rep = [[NSBitmapImageRep alloc] initWithBitmapDataPlanes:NULL
     pixelsWide:760 * scale pixelsHigh:480 * scale bitsPerSample:8 samplesPerPixel:4
     hasAlpha:YES isPlanar:NO colorSpaceName:NSCalibratedRGBColorSpace bytesPerRow:0 bitsPerPixel:0];
-  rep.size = NSMakeSize(760, 480);
   NSGraphicsContext *bitmap = [NSGraphicsContext graphicsContextWithBitmapImageRep:rep];
   CGContextRef cg = bitmap.CGContext;
   CGContextTranslateCTM(cg, 0, 480 * scale);
@@ -47,6 +46,9 @@ static NSBitmapImageRep *Render(CGFloat scale) {
 
   Label(@"Then open Veil from your Applications folder.", 402, 14, NSFontWeightRegular, muted);
   [NSGraphicsContext restoreGraphicsState];
+  // Set the logical size only after drawing. Setting it before creating the
+  // graphics context makes AppKit apply its own HiDPI scale, doubling ours.
+  rep.size = NSMakeSize(760, 480);
   return rep;
 }
 
