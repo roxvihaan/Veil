@@ -14,3 +14,4 @@ This repository contains only Veil. Do not mix it with other utilities from the 
 - Neofetch uses a user-level wrapper and six-color placeholders. Do not overwrite the system Neofetch binary.
 - Do not modify or re-sign other applications to force external-terminal integration.
 - Run `npm test` after packaging. Do not restart a user's live Veil sessions during tests.
+- Distribute versioned Apple Silicon DMGs through GitHub Releases and the `roxvihaan/tap` Homebrew cask. Keep release SHA-256 checksums pinned, preserve Gatekeeper/quarantine, and disclose ad-hoc signing until Developer ID notarization is available. Never replace an already-published release artifact in place.

@@ -9,6 +9,8 @@ const target = join(root, 'release', 'Veil Terminal.app');
 const resources = join(target, 'Contents', 'Resources');
 const appRoot = join(resources, 'app');
 const version = (await readFile(join(root, 'node_modules/electron/dist/version'), 'utf8')).trim();
+const appVersion = JSON.parse(await readFile(join(root, 'package.json'), 'utf8')).version;
+if (!/^\d+\.\d+\.\d+$/.test(appVersion)) throw new Error('Release version must be major.minor.patch');
 const headersRoot = join(root, '.cache/electron-headers');
 function run(command, args) {
   const result = spawnSync(command, args, { stdio:'inherit', cwd:root });
@@ -20,7 +22,7 @@ function run(command, args) {
 run(process.execPath, [join(root, 'node_modules/node-gyp/bin/node-gyp.js'), 'install',
   '--ensure', `--target=${version}`, '--dist-url=https://electronjs.org/headers', `--devdir=${headersRoot}`]);
 await mkdir(join(root, 'native/build'), { recursive:true });
-run('xcrun', ['clang++', '-std=c++17', '-ObjC++', '-dynamiclib', '-undefined', 'dynamic_lookup',
+run('xcrun', ['clang++', '-std=c++17', '-ObjC++', '-mmacosx-version-min=12.0', '-dynamiclib', '-undefined', 'dynamic_lookup',
   '-DNAPI_DISABLE_CPP_EXCEPTIONS', '-I', join(headersRoot, version, 'include/node'),
   '-I', join(root, 'node_modules/node-addon-api'), '-framework', 'AppKit', '-framework', 'CoreGraphics',
   join(root, 'native/veil_blur.mm'), '-o', join(root, 'native/build/veil_blur.node')]);
@@ -44,7 +46,13 @@ run(process.execPath, [join(root, 'scripts/build-veil-image.mjs')]);
 run(process.execPath, [join(root, 'scripts/patch-veil-terminal-persistence.mjs')]);
 run(process.execPath, [join(root, 'scripts/patch-veil-background.mjs')]);
 await cp(join(root, 'assets/Info.plist'), join(target, 'Contents/Info.plist'));
+for (const key of ['CFBundleShortVersionString', 'CFBundleVersion']) {
+  run('/usr/libexec/PlistBuddy', ['-c', `Set :${key} ${appVersion}`, join(target, 'Contents/Info.plist')]);
+}
 await cp(join(root, 'assets/veil.icns'), join(resources, 'electron.icns'));
+await cp(join(root, 'THIRD_PARTY_NOTICES.md'), join(resources, 'THIRD_PARTY_NOTICES.md'));
+await cp(join(root, 'licenses'), join(resources, 'licenses'), { recursive:true });
+await cp(join(root, 'node_modules/electron/dist/LICENSES.chromium.html'), join(resources, 'LICENSES.chromium.html'));
 run('codesign', ['--force', '--deep', '--sign', '-', target]);
 run('codesign', ['--verify', '--deep', '--strict', target]);
 console.log(`Built ${target}\nDrag this app into Applications to install it.`);

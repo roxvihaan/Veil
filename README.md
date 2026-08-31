@@ -6,6 +6,32 @@ Veil uses an Electron macOS window, xterm.js and real pseudo-terminal sessions. 
 
 ## Installation
 
+### Download the DMG
+
+Download [Veil 0.1.0 for Apple Silicon](https://github.com/roxvihaan/Veil/releases/download/v0.1.0/Veil-0.1.0-arm64.dmg), open it, then drag **Veil Terminal** onto **Applications**. Eject the disk image and launch Veil from Applications. No Node.js, npm or compiler is needed for the downloaded app.
+
+This release is **Apple Silicon only** (M1 or newer), targets macOS 12 or newer, and has been tested on macOS 26.5.1. Intel is not included. The [release page](https://github.com/roxvihaan/Veil/releases/tag/v0.1.0) also includes a SHA-256 checksum file.
+
+**First-launch security:** this release is ad-hoc signed, not Developer ID notarized. macOS may block the initial launch. Only if you trust this source, follow [Apple's instructions for approving an unnotarized app](https://support.apple.com/en-us/102445) in System Settings → Privacy & Security → Open Anyway after attempting to open it. Do not disable Gatekeeper or remove quarantine globally. This distribution does not change your security settings.
+
+### Install with Homebrew
+
+```sh
+brew install --cask roxvihaan/tap/veil
+```
+
+This uses the project's [personal Homebrew tap](https://github.com/roxvihaan/homebrew-tap), not the main `homebrew/cask` catalog. It installs the same Apple Silicon DMG and links the `veil` command into Homebrew's bin directory. Homebrew verifies the pinned download checksum. Approve only this cask if Homebrew asks you to trust it; whole-tap trust is unnecessary. The first-launch security note above still applies.
+
+To update or uninstall:
+
+```sh
+brew update
+brew upgrade --cask roxvihaan/tap/veil
+brew uninstall --cask roxvihaan/tap/veil
+```
+
+Save your terminal work and quit Veil before upgrading or uninstalling. Normal uninstall preserves `~/.config/veil/config`. If you already installed Veil manually, do not use `--force` to overwrite it blindly; quit it and move that copy aside before installing with Homebrew.
+
 ### Build from this repository
 
 Requirements: macOS, **Node.js 22.12 or newer**, npm, Git and Xcode Command Line Tools. Run `xcode-select --install` if the command-line tools are not installed. Apple Silicon is the tested architecture; Intel builds have not been verified.
@@ -23,7 +49,7 @@ The first install/build downloads Electron and matching native headers, so it ne
 
 The generated app is `release/Veil Terminal.app`. The build tested for this upload is **Apple Silicon / arm64**, not a universal Intel build. Its bundle declares macOS 12.0 as the minimum; the current implementation has been exercised locally on macOS 26.5.1. Blur behavior on other macOS versions is not guaranteed.
 
-1. Build the app using the commands above, or obtain `Veil Terminal.app` from a trusted release archive if one is provided. A source-only checkout is not an installable application.
+1. Build the app using the commands above, or download the DMG linked above. A source-only checkout is not an installable application.
 2. Drag the app into **Applications**.
 3. Open **Veil Terminal** from Finder or Launchpad.
 4. In Veil, try `veil liquid`, `veil clear 100` or `veil mac text`.
@@ -230,6 +256,7 @@ scripts/patch-veil-terminal-persistence.mjs Terminal sizing/lifecycle patch
 scripts/veil-split-sizing.css              Root-pane and split geometry
 scripts/patch-veil-background.mjs          Live background-color binding
 scripts/package-mac.mjs                    Standalone macOS packager
+scripts/package-dmg.mjs                    Versioned drag-to-install disk image
 assets/                                   App icon and Launch Services metadata
 tests/                                    Command, latency and geometry checks
 ```
@@ -254,6 +281,18 @@ codesign --verify --deep --strict "release/Veil Terminal.app"
 ```
 
 This is ad-hoc development signing, not notarization. Keep generated app bundles and dependencies out of ordinary source commits; distribute installable app archives as release assets. Preserve third-party notices when distributing Electron, xterm.js and other dependencies.
+
+### Build a release DMG
+
+```sh
+npm run package:dmg
+npm test
+npm run test:dmg
+```
+
+This builds an Apple Silicon app and creates `release/Veil-<version>-arm64.dmg` plus its `.sha256` file. The DMG contains only the app and an Applications shortcut; third-party license notices are inside the app's Resources directory. App versions are synchronized from `package.json`. The native modules target macOS 12 rather than silently inheriting the build machine's newer deployment target.
+
+`test:dmg` mounts the image read-only, verifies the app signature, version, notices, shortcut, native deployment target and image renderer, and then ejects it. Existing user sessions and installed apps are untouched. The packager refuses to overwrite a versioned DMG; use a new version for a new release. See [the maintainer release guide](docs/releases.md) for GitHub and Homebrew publishing.
 
 ## Troubleshooting
 

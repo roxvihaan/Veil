@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -163,6 +163,20 @@ test("veil image renders native macOS image formats as terminal ASCII", async ()
     runFile(veil, ["image", "/definitely/missing/veil-image.png"]),
     (error) => error.code === 1 && /cannot read image/.test(error.stderr),
   );
+});
+
+test("Homebrew-style symlinks still locate the bundled image renderer", async () => {
+  const root = await mkdtemp(join(tmpdir(), "veil-brew-link-"));
+  try {
+    await symlink(veil, join(root, 'veil-absolute'));
+    await symlink('veil-absolute', join(root, 'veil-relative'));
+    for (const name of ['veil-absolute', 'veil-relative']) {
+      const { stdout } = await runFile(join(root, name), ['image', sampleImage]);
+      assert.match(stdout, /\x1b\[38;2;/);
+    }
+  } finally {
+    await rm(root, {recursive:true, force:true});
+  }
 });
 
 test("veil image animates GIFs in one PTY and restores the screen on Ctrl-C", async () => {

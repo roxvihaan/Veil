@@ -46,7 +46,23 @@ if [ "$1" = "image" ]; then
     usage
     exit 2
   fi
-  script_dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+  # Homebrew links this command into its bin directory. Follow the link back
+  # into the app so the native image helper is still found beside this script.
+  script_path="$0"
+  link_count=0
+  while [ -L "$script_path" ]; do
+    link_count=$((link_count + 1))
+    if [ "$link_count" -gt 40 ]; then
+      printf '%s\n' 'veil: too many command symlinks.' >&2
+      exit 1
+    fi
+    link_target="$(readlink "$script_path")"
+    case "$link_target" in
+      /*) script_path="$link_target" ;;
+      *) script_path="$(dirname -- "$script_path")/$link_target" ;;
+    esac
+  done
+  script_dir="$(CDPATH= cd -- "$(dirname -- "$script_path")" && pwd)"
   if [ ! -x "${script_dir}/veil-image" ]; then
     printf '%s\n' 'veil: image renderer is missing from this installation.' >&2
     exit 1
