@@ -1,5 +1,7 @@
 # Veil Terminal
 
+[Download the DMG from Releases](https://github.com/roxvihaan/Veil/releases)
+
 A minimal macOS terminal with real desktop transparency, blurred Liquid mode, live config commands, tabs, splits, color ASCII images and GIF playback. An optional Neofetch extension remembers a custom image as your default logo.
 
 Veil uses an Electron macOS window, xterm.js and real pseudo-terminal sessions. It is a terminal emulator, not a simulated command prompt.
@@ -7,6 +9,8 @@ Veil uses an Electron macOS window, xterm.js and real pseudo-terminal sessions. 
 ## Installation
 
 ### Download the DMG
+
+Open [Releases](https://github.com/roxvihaan/Veil/releases) and download the `.dmg` under **Assets** for the version you want.
 
 Download [Veil 0.1.0 for Apple Silicon](https://github.com/roxvihaan/Veil/releases/download/v0.1.0/Veil-0.1.0-arm64.dmg), open it, then drag **Veil Terminal** onto **Applications**. Eject the disk image and launch Veil from Applications. No Node.js, npm or compiler is needed for the downloaded app.
 
