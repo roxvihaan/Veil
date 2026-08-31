@@ -1,4 +1,4 @@
-import { cp, access, mkdtemp, readFile, rename, rm, symlink, writeFile } from 'node:fs/promises';
+import { access, mkdir, mkdtemp, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { createReadStream } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { join, resolve } from 'node:path';
@@ -29,15 +29,26 @@ run('codesign', ['--verify', '--deep', '--strict', appBundle]);
 const bundledVersion = run('/usr/libexec/PlistBuddy', ['-c', 'Print :CFBundleShortVersionString', join(appBundle, 'Contents/Info.plist')], true);
 if (bundledVersion !== version) throw new Error('App version is stale; run npm run package:mac first');
 
+// Keep packaging-only Python dependencies isolated from the user's Python.
+const python = join(root, '.cache/dmg-venv/bin/python');
+try { await access(python); }
+catch { run('python3', ['-m', 'venv', join(root, '.cache/dmg-venv')]); }
+run(python, ['-m', 'pip', 'install', '--disable-pip-version-check', '-r', join(root, 'scripts/requirements-dmg.txt')]);
+await mkdir(join(root, 'native/build'), {recursive:true});
+const backgroundTool = join(root, 'native/build/dmg-background');
+const background = join(root, '.cache/dmg-background.tiff');
+run('xcrun', ['clang', '-fobjc-arc', '-mmacosx-version-min=12.0', '-framework', 'AppKit',
+  join(root, 'native/dmg_background.m'), '-o', backgroundTool]);
+run(backgroundTool, [background]);
+
 // Only this newly-created staging directory is cleaned up. Published DMGs
 // and installed/live app bundles are never overwritten by this script.
 const staging = await mkdtemp(join(root, 'release/.dmg-stage-'));
 try {
-  const contents = join(staging, 'contents');
-  await cp(appBundle, join(contents, 'Veil Terminal.app'), { recursive:true, verbatimSymlinks:true });
-  await symlink('/Applications', join(contents, 'Applications'));
   const temporaryDmg = join(staging, filename);
-  run('hdiutil', ['create', '-volname', 'Veil Terminal', '-srcfolder', contents, '-fs', 'HFS+', '-format', 'UDZO', temporaryDmg]);
+  run(python, ['-m', 'dmgbuild', '-s', join(root, 'scripts/dmg-settings.py'),
+    '-D', `app=${appBundle}`, '-D', `background=${background}`, '-D', `icon=${join(root, 'assets/veil.icns')}`,
+    'Veil Terminal', temporaryDmg]);
   run('hdiutil', ['verify', temporaryDmg]);
   const hash = createHash('sha256');
   for await (const chunk of createReadStream(temporaryDmg)) hash.update(chunk);

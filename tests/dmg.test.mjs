@@ -25,6 +25,13 @@ test('DMG checksum, Applications shortcut, signed app and image helper survive p
     await run('hdiutil', ['attach', '-readonly', '-nobrowse', '-noautoopen', '-mountpoint', mount, dmg]);
     attached = true;
     assert.equal(await readlink(join(mount, 'Applications')), '/Applications');
+    const { stdout: layout } = await run(join(root, '.cache/dmg-venv/bin/python'), [join(root, 'tests/dmg-layout.py'), mount]);
+    console.log(layout.trim());
+    const { stdout: tiffInfo, stderr: tiffErrors } = await run('tiffutil', ['-info', join(mount, '.background.tiff')]);
+    const retina = tiffInfo + tiffErrors;
+    assert.match(retina, /Image Width: 760 Image Length: 480/);
+    assert.match(retina, /Image Width: 1520 Image Length: 960/);
+    assert.match(retina, /Resolution: 144, 144/);
     const bundle = join(mount, 'Veil Terminal.app');
     await run('codesign', ['--verify', '--deep', '--strict', bundle]);
     const plist = join(bundle, 'Contents/Info.plist');
