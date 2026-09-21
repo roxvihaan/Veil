@@ -6,6 +6,10 @@ A minimal macOS terminal with real desktop transparency, blurred Liquid mode, li
 
 Veil uses an Electron macOS window, xterm.js and real pseudo-terminal sessions. It is a terminal emulator, not a simulated command prompt.
 
+## Coming soon
+
+CLI — coming soon.
+
 ## Installation
 
 ### Download the DMG
