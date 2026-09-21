@@ -22,15 +22,17 @@ usage() {
     '       veil profile <name>|list' \
     '       veil default [text]' \
     '       veil mac text' \
-    '       veil image <path>'
+    '       veil image <path>' \
+    '       veil reminders [list|lists|add|done|help]'
 }
 
 fail_usage() { usage >&2; exit 2; }
 [ "$#" -ge 1 ] || fail_usage
 
 # Image rendering stays independent from appearance configuration.
-if [ "$1" = "image" ]; then
-  [ "$#" -eq 2 ] || fail_usage
+if [ "$1" = "image" ] || [ "$1" = "reminders" ]; then
+  helper="veil-$1"
+  if [ "$1" = "image" ]; then [ "$#" -eq 2 ] || fail_usage; fi
   script_path="$0"
   link_count=0
   while [ -L "$script_path" ]; do
@@ -46,11 +48,12 @@ if [ "$1" = "image" ]; then
     esac
   done
   script_dir="$(CDPATH= cd -- "$(dirname -- "$script_path")" && pwd)"
-  if [ ! -x "${script_dir}/veil-image" ]; then
-    printf '%s\n' 'veil: image renderer is missing from this installation.' >&2
+  if [ ! -x "${script_dir}/${helper}" ]; then
+    printf 'veil: %s helper is missing from this installation.\n' "$helper" >&2
     exit 1
   fi
-  exec "${script_dir}/veil-image" "$2"
+  shift
+  exec "${script_dir}/${helper}" "$@"
 fi
 
 config_root="${XDG_CONFIG_HOME:-${HOME}/.config}"

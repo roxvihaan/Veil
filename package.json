@@ -15,7 +15,7 @@
     "package:dmg": "npm run package:mac && node scripts/package-dmg.mjs",
     "build:veil-image": "node scripts/build-veil-image.mjs",
     "test": "npm run test:commands && npm run test:neofetch && npm run test:latency && npm run test:sizing",
-    "test:commands": "node --test tests/veil-command.test.mjs",
+    "test:commands": "node --test tests/veil-command.test.mjs tests/reminders.test.mjs",
     "test:neofetch": "node --test tests/neofetch-image.test.mjs",
     "test:latency": "node --test tests/terminal-latency.test.mjs",
     "test:sizing": "electron tests/veil-sizing.electron.cjs",

@@ -95,6 +95,27 @@ Do not point `NEOFETCH_REAL` at the wrapper itself. Ensure `~/.local/bin` preced
 
 ## Features and everyday use
 
+### Apple Reminders
+
+Veil connects to Apple Reminders through macOS EventKit. Run:
+
+```sh
+veil reminders
+veil reminders lists
+veil reminders list "Personal"
+veil reminders add "Buy coffee" "Personal"
+veil reminders add "Buy coffee" --notes "Whole beans, medium roast"
+veil reminders add "Buy coffee" "Personal" --notes "Whole beans, medium roast"
+veil reminders done <full-ID-from-the-list>
+veil reminders help
+```
+
+The first data command requests macOS Reminders permission. `help` never requests access. The default view shows incomplete reminders across lists; `add` without a list uses your default Reminders list. Use a list ID when names are duplicated. `done` requires an exact reminder ID and is safe to repeat. Changes are saved to Apple Reminders; account syncing is handled by macOS.
+
+Access is requested only when you run a Reminders command. If denied, enable it under System Settings → Privacy & Security → Reminders for Veil or the terminal launching the command. The native helper includes its own permission description for use outside Veil. These commands require a build containing the helper; older published installers do not include it.
+
+Maintainers can compile the helper with `node scripts/build-veil-reminders.mjs`; normal macOS packaging bundles it automatically.
+
 ### Clear and Liquid glass
 
 Veil shows the actual desktop and windows behind it. No wallpaper is bundled or simulated.

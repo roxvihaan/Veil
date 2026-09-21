@@ -94,6 +94,10 @@
 	<string>This app needs access to Bluetooth</string>
 	<key>NSCameraUsageDescription</key>
 	<string>This app needs access to the camera</string>
+	<key>NSRemindersUsageDescription</key>
+	<string>Veil lists, creates and completes reminders when you run veil reminders commands.</string>
+	<key>NSRemindersFullAccessUsageDescription</key>
+	<string>Veil lists, creates and completes reminders when you run veil reminders commands.</string>
 	<key>NSHighResolutionCapable</key>
 	<true/>
 	<key>NSMainNibFile</key>

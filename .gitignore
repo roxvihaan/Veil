@@ -3,6 +3,7 @@ release/
 .cache/
 native/build/
 bin/veil-image
+bin/veil-reminders
 .DS_Store
 *.log
 .env
