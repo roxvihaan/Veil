@@ -46,9 +46,9 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>0.1.1</string>
+	<string>0.1.2</string>
 	<key>CFBundleVersion</key>
-	<string>0.1.1</string>
+	<string>0.1.2</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
@@ -94,6 +94,10 @@
 	<string>This app needs access to Bluetooth</string>
 	<key>NSCameraUsageDescription</key>
 	<string>This app needs access to the camera</string>
+	<key>NSContactsUsageDescription</key>
+	<string>Veil looks up contacts and displays saved contact names when you run veil messages commands.</string>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>Veil sends messages and controls Spotify playback when you run veil messages send or veil spotify commands.</string>
 	<key>NSRemindersUsageDescription</key>
 	<string>Veil lists, creates and completes reminders when you run veil reminders commands.</string>
 	<key>NSRemindersFullAccessUsageDescription</key>

@@ -1,7 +1,18 @@
-const { contextBridge, ipcRenderer } = require("electron");
+const { contextBridge, ipcRenderer, webUtils } = require("electron");
 
 contextBridge.exposeInMainWorld("veil", {
   platform: process.platform,
+  dropImage: (id,file) => {
+    let filePath='';try{filePath=webUtils.getPathForFile(file);}catch{}
+    return ipcRenderer.invoke('terminal:image-drop',{id,file:filePath});
+  },
+  pipAction: (action) => ipcRenderer.send('pip:action', action),
+  pipPanes: (panes) => ipcRenderer.send('pip:panes', panes),
+  onPiP: (callback) => {
+    const handler = (_event, message) => callback(message);
+    ipcRenderer.on('pip:event', handler);
+    return () => ipcRenderer.removeListener('pip:event', handler);
+  },
   getConfig: () => ipcRenderer.invoke("config:get"),
   setConfig: (key, value) => ipcRenderer.invoke("config:set", { key, value }),
   openConfig: () => ipcRenderer.invoke("config:open"),

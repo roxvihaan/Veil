@@ -76,6 +76,46 @@ async function checkTint(mode, color, opacity, rgb) {
   });
 }
 
+async function checkSplitResize(horizontal) {
+  const before = { serial, closed };
+  await js(`window.retainedTerminals = Array.from(document.querySelectorAll('.tab-workspace.is-active .xterm'))`);
+  const geometry = await js(`(() => {
+    const root=document.querySelector('.tab-workspace.is-active .veil-resizable');
+    const box=root.getBoundingClientRect();
+    return {x:box.x,y:box.y,width:box.width,height:box.height};
+  })()`);
+  const point = fraction => ({
+    x: Math.round(geometry.x + geometry.width * (horizontal ? fraction : .5)),
+    y: Math.round(geometry.y + geometry.height * (horizontal ? .5 : fraction)),
+  });
+  const value = () => js(`Number(document.querySelector('.tab-workspace.is-active .split-resizer').getAttribute('aria-valuenow'))`);
+  win.webContents.sendInputEvent({type:'mouseDown',button:'left',clickCount:1,...point(.5)});
+  win.webContents.sendInputEvent({type:'mouseMove',...point(.7)});
+  win.webContents.sendInputEvent({type:'mouseUp',button:'left',clickCount:1,...point(.7)});
+  await checkFit('dragged split');
+  assert.ok(Math.abs(await value()-70)<=1, 'divider must follow dragging');
+  win.webContents.sendInputEvent({type:'mouseDown',button:'left',clickCount:1,...point(.7)});
+  win.webContents.sendInputEvent({type:'mouseMove',...point(.505)});
+  win.webContents.sendInputEvent({type:'mouseUp',button:'left',clickCount:1,...point(.505)});
+  await settle();
+  assert.equal(await value(),50,'divider must snap to equal sizes near center');
+  await js(`document.querySelector('.tab-workspace.is-active .split-resizer').dispatchEvent(new KeyboardEvent('keydown',{key:'${horizontal ? 'ArrowRight' : 'ArrowDown'}',bubbles:true}))`);
+  await settle();
+  assert.equal(await value(),52,'arrow keys must resize');
+  await js(`document.querySelector('.tab-workspace.is-active .split-resizer').dispatchEvent(new MouseEvent('dblclick',{bubbles:true}))`);
+  await checkFit('reset split');
+  assert.equal(await value(),50,'double-click must restore equal sizes');
+  await js(`(() => { const divider=document.querySelector('.tab-workspace.is-active .split-resizer');
+    for(let i=0;i<12;i++)divider.dispatchEvent(new KeyboardEvent('keydown',{key:'${horizontal ? 'ArrowRight' : 'ArrowDown'}',shiftKey:true,bubbles:true})); })()`);
+  await settle();
+  assert.ok(await value()<100,'resizing must not collapse the other pane');
+  await js(`document.querySelector('.tab-workspace.is-active .split-resizer').dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}))`);
+  await settle();
+  assert.equal(await value(),50,'Enter must reset split sizes');
+  assert.deepEqual({serial,closed},before,'resizing must preserve shells');
+  assert.ok(await js(`window.retainedTerminals.every(el=>el.isConnected)`),'resizing must preserve xterm instances');
+}
+
 app.whenReady().then(async () => {
   win = new BrowserWindow({ width:1120, height:720, show:false, backgroundColor:'#171a1e',
     webPreferences:{ preload:join(packaged, 'electron/preload.cjs'), backgroundThrottling:false } });
@@ -160,11 +200,12 @@ app.whenReady().then(async () => {
     await settle();
     await js(`document.querySelector('.tab-workspace.is-active .pane-leaf').dispatchEvent(new MouseEvent('contextmenu', {bubbles:true,clientX:150,clientY:150}));`);
     await settle();
-    await js(`Array.from(document.querySelectorAll('.split-menu button')).find(b=>b.textContent==='Add tab above').click()`);
+    await js(`Array.from(document.querySelectorAll('.split-menu button')).find(b=>b.textContent==='Split above').click()`);
     const splitPanes = await checkFit('vertical split');
     assert.equal(splitPanes.length, 2);
     assert.equal(serial, 3, 'splitting must create only one additional shell');
     assert.equal(closed, 0, 'splitting must preserve existing sessions');
+    await checkSplitResize(false);
     await checkTint('liquid', '#123456', 0.4, [18, 52, 86]);
     assert.ok(await js(`Array.from(document.querySelectorAll('.pane-leaf, .terminal-pane, .xterm, .xterm-viewport')).every(el => {
       const ctx = document.createElement('canvas').getContext('2d');
@@ -181,8 +222,28 @@ app.whenReady().then(async () => {
     assert.equal((await checkFit('split closed back to full-height pane')).length, 1);
     await js(`document.querySelector('.tab-workspace.is-active .pane-leaf').dispatchEvent(new MouseEvent('contextmenu', {bubbles:true,clientX:150,clientY:150}));`);
     await settle();
-    await js(`Array.from(document.querySelectorAll('.split-menu button')).find(b=>b.textContent==='Add tab right').click()`);
+    await js(`Array.from(document.querySelectorAll('.split-menu button')).find(b=>b.textContent==='Split right').click()`);
     assert.equal((await checkFit('horizontal split')).length, 2);
+    await checkSplitResize(true);
+    const beforeBelow = { serial, closed };
+    await js(`(() => {
+      window.beforeBelow = Array.from(document.querySelectorAll('.tab-workspace.is-active .xterm'));
+      window.beforeBelow[0].closest('.pane-leaf').dispatchEvent(new MouseEvent('contextmenu', {bubbles:true,clientX:innerWidth-5,clientY:innerHeight-5}));
+    })()`);
+    await settle();
+    assert.ok(await js(`document.querySelector('.split-menu').getBoundingClientRect().bottom <= innerHeight`), 'expanded split menu must fit near the bottom edge');
+    await js(`Array.from(document.querySelectorAll('.split-menu button')).find(b=>b.textContent==='Split below').click()`);
+    assert.equal((await checkFit('nested below split')).length, 3);
+    assert.equal(serial, beforeBelow.serial + 1, 'below split creates exactly one shell');
+    assert.equal(closed, beforeBelow.closed, 'below split preserves existing shells');
+    assert.ok(await js(`(() => {
+      const split=document.querySelector('.tab-workspace.is-active .split-node.vertical');
+      const regions=Array.from(split.children).filter(el=>el.classList.contains('split-region'));
+      return window.beforeBelow.every(el=>el.isConnected) && regions[0].contains(window.beforeBelow[0]) &&
+        regions[1].getBoundingClientRect().top >= regions[0].getBoundingClientRect().bottom &&
+        !window.beforeBelow.includes(regions[1].querySelector('.xterm'));
+    })()`), 'new pane must appear below the retained terminal');
+    writeFileSync(join(tmpdir(), 'veil-split-resize-preview.png'), (await win.webContents.capturePage()).toPNG());
     console.log('PASS: live background colors, terminal geometry, font changes, tab activation and split preservation');
     app.exit(0);
   } catch (error) {

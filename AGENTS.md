@@ -2,6 +2,11 @@
 
 This repository contains only Veil. Do not mix it with other utilities from the parent workspace.
 
+- External PiP docking supports any app exposing movable/resizable windows through macOS Accessibility, not just Dia. Link the explicitly selected external window to an empty split without capturing video or reparenting it. Preserve playback, release the link when its pane disappears, and keep Accessibility work outside the PTY process. Never auto-select a main app window; label candidates with app, title, and size.
+- Draggable ASCII images/GIFs must preserve their existing terminal session and animation state; no screenshots or restarting commands to simulate moving content.
+- `veil pip bound` (and plain `veil pip`) retains split-fitting behavior. `veil pip unbound` follows the target split's center but keeps the external PiP size independent, including when it extends beyond the split; never resize the split or write native size attributes in unbound mode.
+- Keep the right-click menu to split actions only: no image/GIF or PiP entry. Dropping one image/GIF file at an empty prompt runs `veil image <quoted path>` in that pane. `veil pip` reuses the invoking split and parks its terminal for restoration; selecting the external PiP docks it directly without requiring another drag. Do not create another split or kill the existing shell.
+
 - Build with `npm ci && npm run package:mac`. Generated bundles, dependency directories and native binaries stay out of Git.
 - `renderer/` is the current compiled React/xterm snapshot. The editable terminal lifecycle/sizing component is in `scripts/patch-veil-terminal-persistence.mjs`; packaging applies it idempotently. Do not claim the original JSX sources are included.
 - Preserve real PTYs and interactive login shells. Seed PATH for Finder launches with the bundled tools, user-local directories and both Homebrew prefixes.
@@ -15,5 +20,6 @@ This repository contains only Veil. Do not mix it with other utilities from the 
 - Neofetch uses a user-level wrapper and six-color placeholders. Do not overwrite the system Neofetch binary.
 - Do not modify or re-sign other applications to force external-terminal integration.
 - Run `npm test` after packaging. Do not restart a user's live Veil sessions during tests.
+- Preserve the outer app's stable local signing requirement (`com.veilterminal.app`) as well as the PiP helper's own identity. TCC attributes helper Accessibility requests to Veil; a changing ad-hoc CDHash invalidates existing grants even when the toggle remains enabled. Never bypass or silently reset permissions.
 - Distribute versioned Apple Silicon DMGs through GitHub Releases and the `roxvihaan/tap` Homebrew cask. Keep release SHA-256 checksums pinned, preserve Gatekeeper/quarantine, and disclose ad-hoc signing until Developer ID notarization is available. Never replace an already-published release artifact in place.
 - The DMG must open as a large, polished drag-to-install Finder window: prominent instructions, large actual Veil and Applications icons, a directional arrow, and no sidebar/toolbar clutter. Preserve the fixed layout and Retina background; verify the mounted installer visually before release.

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>CFBundleIdentifier</key><string>com.veilterminal.imessage</string>
+<key>CFBundleName</key><string>Veil iMessage</string>
+<key>NSAppleEventsUsageDescription</key><string>Veil sends messages through Messages when you run veil messages send.</string>
+<key>NSContactsUsageDescription</key><string>Veil displays saved contact names in Messages commands.</string>
+</dict></plist>

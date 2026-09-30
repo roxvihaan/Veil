@@ -4,7 +4,11 @@ release/
 native/build/
 bin/veil-image
 bin/veil-reminders
+bin/veil-imessage
 .DS_Store
 *.log
 .env
 .env.*
+bin/veil-spotify
+bin/veil-spotify.applescript
+bin/veil-contacts

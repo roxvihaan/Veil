@@ -44,6 +44,10 @@ for (const dependency of ['node-pty', 'node-addon-api']) {
 await chmod(join(appRoot, 'bin/veil'), 0o755);
 run(process.execPath, [join(root, 'scripts/build-veil-image.mjs')]);
 run(process.execPath, [join(root, 'scripts/build-veil-reminders.mjs'), '--bundle']);
+run(process.execPath, [join(root, 'scripts/build-veil-imessage.mjs'), '--bundle']);
+run(process.execPath, [join(root, 'scripts/build-veil-spotify.mjs'), '--bundle']);
+run(process.execPath, [join(root, 'scripts/build-veil-contacts.mjs'), '--bundle']);
+run(process.execPath, [join(root, 'scripts/build-veil-pip.mjs'), '--bundle']);
 run(process.execPath, [join(root, 'scripts/patch-veil-appearance.mjs')]);
 run(process.execPath, [join(root, 'scripts/patch-veil-terminal-persistence.mjs')]);
 run(process.execPath, [join(root, 'scripts/patch-veil-background.mjs')]);
@@ -56,5 +60,10 @@ await cp(join(root, 'THIRD_PARTY_NOTICES.md'), join(resources, 'THIRD_PARTY_NOTI
 await cp(join(root, 'licenses'), join(resources, 'licenses'), { recursive:true });
 await cp(join(root, 'node_modules/electron/dist/LICENSES.chromium.html'), join(resources, 'LICENSES.chromium.html'));
 run('codesign', ['--force', '--deep', '--sign', '-', target]);
+// TCC attributes the child PiP helper to its containing app. Pin the outer
+// development identity too; a default ad-hoc CDHash changes every rebuild.
+// Sign only the outer bundle here, preserving nested helpers' own identities.
+run('codesign', ['--force', '--sign', '-', '--identifier', 'com.veilterminal.app',
+  '--requirements', '=designated => identifier "com.veilterminal.app"', target]);
 run('codesign', ['--verify', '--deep', '--strict', target]);
 console.log(`Built ${target}\nDrag this app into Applications to install it.`);

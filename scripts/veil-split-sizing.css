@@ -23,3 +23,48 @@
 .terminal-pane .xterm-bold:not([class*="xterm-fg-"]):not([style*="color"]) {
   color: var(--veil-bold-foreground) !important;
 }
+
+.veil-resizable { position: relative; }
+.split-region { overflow: hidden; }
+.split-region > .pane-leaf { width: 100%; height: 100%; }
+.veil-resizable > .split-resizer {
+  position: absolute;
+  z-index: 5;
+  flex: none;
+  border: 0;
+  touch-action: none;
+  user-select: none;
+  -webkit-app-region: no-drag;
+}
+.veil-resizable.horizontal > .split-resizer {
+  top: 0; bottom: 0; width: 8px; margin-left: -4px; cursor: col-resize;
+}
+.veil-resizable.vertical > .split-resizer {
+  left: 0; right: 0; height: 8px; margin-top: -4px; cursor: row-resize;
+}
+.split-resizer:hover, .split-resizer:focus-visible {
+  background: rgba(238, 243, 234, .14);
+  outline: none;
+}
+
+.veil-pip-pane { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 18px; box-sizing: border-box; min-width: 0; overflow: hidden; }
+.veil-pip-pane::before { content: ''; pointer-events: none; position: absolute; inset: 5px; border: 1px solid transparent; border-radius: 5px; transition: background 140ms ease, border-color 140ms ease, border-radius 140ms ease, inset 140ms ease; }
+.veil-pip-pane.is-target::before { inset: calc(14px - var(--dock-strength, .5) * 9px); border-radius: calc(5px + var(--dock-strength, .5) * 7px); border-color: rgba(255,255,255,.16); background: rgba(255,255,255,.025); }
+.veil-pip-pane.is-ready::before { border-color: rgba(255,255,255,.38); background: rgba(255,255,255,.06); }
+.veil-pip-hint { font: 12px -apple-system, sans-serif; opacity: .65; text-align: center; max-width: 320px; }
+.veil-pip-actions { display: flex; flex-direction: column; gap: 6px; max-height: 70%; overflow: auto; max-width: 100%; z-index: 1; }
+.veil-pip-pane button { font: 12px -apple-system, sans-serif; background: rgba(255,255,255,.06); color: inherit; border: 0; border-radius: 5px; padding: 7px 10px; cursor: pointer; overflow-wrap: anywhere; }
+.veil-pip-pane button:hover { background: rgba(255,255,255,.12); }
+.veil-pip-release { z-index: 1; }
+.veil-pip-pane[data-debug]:not([data-debug=''])::after { content: attr(data-debug); position: absolute; top: 8px; left: 8px; font: 11px monospace; }
+@media (prefers-reduced-motion: reduce) { .veil-pip-pane::before { transition: none; } }
+.veil-media-host { width: 100%; height: 100%; min-width: 0; min-height: 0; }
+.veil-media-host { position: relative; }
+.veil-drop-message { position: absolute; bottom: 8px; left: 12px; z-index: 6; font: 12px -apple-system,sans-serif; color: #ffbe9a; pointer-events: none; }
+.veil-image-move { position: absolute; top: 4px; right: 8px; z-index: 6; opacity: 0; border: 0; border-radius: 4px; padding: 4px 6px; background: #ffffff18; color: inherit; font: 11px -apple-system,sans-serif; cursor: grab; }
+.veil-media-host:hover > .veil-image-move, .veil-image-move:focus-visible { opacity: 1; }
+.veil-media-portal { position: fixed; inset: 0; z-index: 100; pointer-events: none; }
+.veil-floating-media { position: absolute; left: 0; top: 0; display: flex; flex-direction: column; min-width: 220px; min-height: 150px; max-width: 100vw; max-height: 100vh; resize: both; overflow: hidden; pointer-events: auto; border-radius: 9px; background: rgba(20,23,28,.85); box-shadow: 0 8px 28px #0004; }
+.veil-floating-media > .terminal-pane { flex: 1; min-height: 0; height: auto; }
+.veil-media-grip { display: flex; align-items: center; justify-content: space-between; flex: none; gap: 12px; padding: 6px 9px; font: 11px -apple-system,sans-serif; cursor: grab; touch-action: none; user-select: none; }
+.veil-media-grip button { border: 0; border-radius: 4px; background: #ffffff10; color: inherit; padding: 3px 6px; cursor: pointer; }

@@ -3,6 +3,7 @@ const path = require("node:path");
 const fs = require("node:fs");
 const os = require("node:os");
 const pty = require("node-pty");
+const {trackInput,imageDrop}=require('./image-drop.cjs');
 
 let nativeBlur;
 for (const candidate of [
@@ -194,6 +195,8 @@ function createWindow() {
       backgroundThrottling: false,
     },
   });
+
+  if (isMac) require('./pip-docking.cjs').installPiP(mainWindow, ipcMain);
 
   if (process.env.VITE_DEV_SERVER_URL) {
     mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL);
@@ -410,7 +413,7 @@ ipcMain.handle("terminal:create", (event, options = {}) => {
     env: terminalEnvironment(shellPath, id),
   });
 
-  sessions.set(id, { terminal, owner: event.sender.id });
+  sessions.set(id, { terminal, owner: event.sender.id, shellPath, inputLength:0, inputUnknown:false });
   rendererHasTerminal = true;
   const sender = event.sender;
   const sendToRenderer = (channel, payload) => {
@@ -459,7 +462,14 @@ ipcMain.handle("terminal:create", (event, options = {}) => {
   return { id, shell: path.basename(shellPath), cwd };
 });
 
-ipcMain.on("terminal:write", (event, { id, data }) => terminalFor(event, id)?.write(data));
+ipcMain.on("terminal:write", (event, { id, data }) => {
+  const terminal=terminalFor(event,id);
+  if(terminal&&typeof data==='string'){trackInput(sessions.get(id),data);terminal.write(data);}
+});
+ipcMain.handle('terminal:image-drop',(event,{id,file}={})=>{
+  if(!terminalFor(event,id))return {ok:false,error:'Terminal is not ready.'};
+  return imageDrop(sessions.get(id),file);
+});
 ipcMain.on("terminal:resize", (event, { id, cols, rows }) => {
   if (cols > 1 && rows > 0) terminalFor(event, id)?.resize(cols, rows);
 });

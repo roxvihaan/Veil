@@ -18,9 +18,9 @@ CLI — coming soon.
 
 Open [Releases](https://github.com/roxvihaan/Veil/releases) and download the `.dmg` under **Assets** for the version you want.
 
-Download [Veil 0.1.1 for Apple Silicon](https://github.com/roxvihaan/Veil/releases/download/v0.1.1/Veil-0.1.1-arm64.dmg). It opens a large installer window with two big icons, an arrow, and **Drag Veil to Applications** instructions. Drag the Veil icon onto the Applications folder, eject the disk image, then launch Veil from Applications. No Node.js, npm or compiler is needed for the downloaded app.
+Download [Veil 0.1.2 for Apple Silicon](https://github.com/roxvihaan/Veil/releases/download/v0.1.2/Veil-0.1.2-arm64.dmg). It opens a large installer window with two big icons, an arrow, and **Drag Veil to Applications** instructions. Drag the Veil icon onto the Applications folder, eject the disk image, then launch Veil from Applications. No Node.js, npm or compiler is needed for the downloaded app.
 
-This release is **Apple Silicon only** (M1 or newer), targets macOS 12 or newer, and has been tested on macOS 26.5.1. Intel is not included. The [release page](https://github.com/roxvihaan/Veil/releases/tag/v0.1.1) also includes a SHA-256 checksum file.
+This release is **Apple Silicon only** (M1 or newer), targets macOS 12 or newer, and has been tested on macOS 26.5.1. Intel is not included. The [release page](https://github.com/roxvihaan/Veil/releases/tag/v0.1.2) also includes a SHA-256 checksum file.
 
 **First-launch security:** this release is ad-hoc signed, not Developer ID notarized. macOS may block the initial launch. Only if you trust this source, follow [Apple's instructions for approving an unnotarized app](https://support.apple.com/en-us/102445) in System Settings → Privacy & Security → Open Anyway after attempting to open it. Do not disable Gatekeeper or remove quarantine globally. This distribution does not change your security settings.
 
@@ -101,6 +101,25 @@ Do not point `NEOFETCH_REAL` at the wrapper itself. Ensure `~/.local/bin` preced
 
 ## Features and everyday use
 
+### PiP docking and draggable ASCII panes
+
+- `veil pip bound` or `veil pip`: fit PiP to the split, preserving the current linked sizing behavior.
+- `veil pip unbound`: follow the split's center while keeping PiP at its own size. Resize it independently; it can extend outside the split. Neither window forces the other's size. Detaching and restoring the terminal work the same in both modes.
+
+Run `veil pip` in the split you want to use. This clears that split's view and parks its existing terminal without closing the shell or creating another split. Select your PiP from the app/window list and it docks directly—no extra drag required. **Return to terminal** restores the original session and scrollback. Veil links the real external window to the split without capturing video or changing playback. PiP no longer appears in the right-click menu. Discovery is app-independent: any PiP exposing movable/resizable windows through macOS Accessibility can be selected. Apps that do not expose those controls cannot be docked.
+
+The native `veil-pip` helper needs macOS **Accessibility** permission. If access is missing, use **Allow Accessibility / retry**, enable `veil-pip` (or Veil Terminal) in System Settings → Privacy & Security → Accessibility, and reconnect. Only the explicitly selected window is controlled. The picker includes ordinary windows because some apps leave PiP titles blank; check the app, title and dimensions before selecting. No screen-recording permission is needed.
+
+If Accessibility is already enabled but Veil still reports denial after an update, remove the old Veil entry and add the exact app you are running again. Older development builds used a changing signing hash, invalidating saved grants while leaving the toggle enabled. Current local builds use stable app and helper signing identities; migrating from an old grant still needs one manual reauthorization. The app does not reset or bypass system permissions.
+
+Moving Veil or resizing a split updates the linked PiP. Resizing the PiP adjusts the nearest split on each axis, within the layout's minimum sizes. Its aspect ratio is preserved, so some pane space may remain unused. Drag the PiP away to detach; Escape cancels tracking of the current dock/drag. Closing its pane, switching away from its tab, hiding/minimizing Veil, or closing the PiP releases the link without closing its source app. Only one external PiP can be linked at a time.
+
+For ASCII, drop one image or GIF file onto a terminal at an empty shell prompt. Veil runs `veil image '<path>'` automatically, with the path safely quoted. Drops are rejected if text is already typed or a different foreground program is running; after complex history/editing, submit or cancel the line first. The image action no longer appears in the right-click menu. You can still type `veil image <path>` normally.
+
+After a successful file drop, hover over that pane and use **Move image / GIF** to float it. Drag the small header into a cleared PiP split or leave it floating within Veil. Drag its bottom-right corner to resize; **Return to split** or Escape returns it to its original pane. This moves the *whole terminal pane* containing the ASCII, retaining its PTY, scrollback and GIF state—not individual characters or a screenshot. Floating media is hidden when its tab is inactive.
+
+External PiP support is experimental: automated docking/layout/session tests pass and live Dia PiP discovery/selection was checked, but end-to-end native dragging, sizing constraints and multi-display behavior still need verification. Dia retains control of its native drag; Veil previews during dragging and animates into place after release rather than fighting the source app by moving the window under the pointer. Edge-created splits are not supported; create an empty split first. These features require a new local build; existing release DMGs are unchanged. See [implementation and tuning](docs/pip-docking.md).
+
 ### Apple Reminders
 
 Veil connects to Apple Reminders through macOS EventKit. Run:
@@ -121,6 +140,76 @@ The first data command requests macOS Reminders permission. `help` never request
 Access is requested only when you run a Reminders command. If denied, enable it under System Settings → Privacy & Security → Reminders for Veil or the terminal launching the command. The native helper includes its own permission description for use outside Veil. These commands require a build containing the helper; older published installers do not include it.
 
 Maintainers can compile the helper with `node scripts/build-veil-reminders.mjs`; normal macOS packaging bundles it automatically.
+
+### Messages contacts
+
+Find a saved phone number or email without leaving Veil:
+
+```sh
+veil messages contacts                         # first 20 contacts
+veil messages contacts list 50
+veil messages contacts search 'Alex'
+veil messages contacts search 'example.com' 50
+veil messages contacts search '5551234'
+veil messages contacts help
+```
+
+Results show names and labeled phone numbers and emails. Search ignores case and accents; phone searches also ignore common phone punctuation. Lists follow your macOS Contacts sort order. Limits are 1–200, and Veil tells you when more matches exist. Searches cover only the contacts macOS makes available to Veil.
+
+The first data command requests **Contacts** permission. If denied, enable Veil (or the launching terminal) in System Settings → Privacy & Security → Contacts. Full Disk Access is not required. Help and invalid commands never request access. Commands are read-only and do not send messages or change contacts.
+
+To message someone, copy the desired number or email into `veil messages send`; use a phone number with country code and no spaces or punctuation except the leading `+`. Contact names are not automatically resolved by the send command, so you choose the intended recipient when there are multiple matches.
+
+Normal packaging bundles the helper. For development use `node scripts/build-veil-contacts.mjs`. Older published installers do not include this integration.
+
+### Messages
+
+Use the Messages account already signed in on your Mac. Contact lookup is available under `veil messages contacts`; `veil imessage` and the standalone `veil contacts` remain compatibility aliases.
+
+Commands:
+
+```sh
+veil messages                 # latest 20 local iMessage chats and their IDs
+veil messages chats 50
+veil messages read 123        # latest 20 messages for chat ID 123, oldest first
+veil messages read 123 50
+veil messages send '+15555550123' 'On my way'
+veil messages send 'friend@example.com' 'Hello!'
+veil messages help
+```
+
+Saved contact names appear in chat lists, incoming-message sender labels, unnamed group participants, and send confirmations. Named groups retain their titles and your own messages remain labeled `You`. macOS Contacts handles phone/email matching; unknown, unnamed, ambiguous, or inaccessible contacts fall back to the original address. The first Messages data command may ask for **Contacts** permission; denying it leaves messaging available with addresses. Display names never change the recipient used for sending or rewrite message text.
+
+`send` submits immediately through Apple Messages, using an enabled iMessage account. It accepts a phone number (prefer international format) or email address, not a chat ID or contact name. Submission does not confirm delivery; check Messages before retrying an uncertain result. SMS/RCS, group sending, attachments, and live watching are not supported.
+
+For reading, grant the launching app (Veil or your other terminal) **Full Disk Access** in System Settings → Privacy & Security. Sending separately requests **Automation → Messages** access. Veil does not change these permissions. Help and invalid commands access neither Messages nor its database. See [Apple’s explanation of macOS data-access controls](https://support.apple.com/guide/security/controlling-app-access-to-files-secddd1d86a6/web).
+
+History is read locally from `~/Library/Messages/chat.db` in read-only mode and includes only iMessage chats synced to this Mac. Limits are 1–200. Rich messages whose text is stored only in an attributed body, attachments, and other non-text records show a placeholder directing you to Messages; they are not decoded. Chat IDs are local to this Mac. Message content is stripped of terminal control characters before display. The database schema is an internal macOS format and may change.
+
+Normal packaging builds and bundles the native helper; for development use `node scripts/build-veil-imessage.mjs`. Older published installers do not contain this integration.
+
+### Spotify
+
+Control the Spotify desktop app locally from Veil:
+
+```sh
+veil spotify                  # playback state, volume, track, artist and album
+veil spotify status
+veil spotify play             # resume
+veil spotify pause
+veil spotify toggle
+veil spotify next
+veil spotify previous
+veil spotify volume           # show Spotify's volume
+veil spotify volume 40        # set Spotify's volume, 0–100
+veil spotify help
+```
+
+Install the Spotify desktop app, open it and sign in first. These commands control that app on this Mac; they do not use the Spotify Web API, store credentials, or change system volume. Playback availability follows your Spotify account and current playback context. Track search, playlists, and remote device selection are not included.
+
+The first valid command may request macOS **Automation → Spotify** permission for Veil or the terminal launching the command. If denied, enable it in System Settings → Privacy & Security → Automation. Help and invalid commands do not contact Spotify. Commands report when Spotify is closed instead of launching it automatically.
+
+Normal packaging bundles the helper and its AppleScript. For development, run `node scripts/build-veil-spotify.mjs`. Older published installers do not contain this integration.
 
 ### Clear and Liquid glass
 
@@ -228,15 +317,18 @@ veil profile delete work
 | New terminal tab | Click `+` or press **⌘T**. |
 | Switch tabs | Click a tab in the top bar. |
 | Close a tab | Use its close control or **⌘W**; the current UI retains the final tab. |
-| Split above | Right-click a pane → **Add tab above**. |
-| Split left/right | Right-click → **Add tab left** or **Add tab right**. |
+| Split above | Right-click a pane → **Split above**. |
+| Split below | Right-click a pane → **Split below**. |
+| Split left/right | Right-click → **Split left** or **Split right**. |
 | Close a split | Right-click → **Close split**. |
+| Resize a split | Drag the divider; it snaps to equal sizes near the center. |
+| Reset split sizes | Double-click the divider, or focus it and press **Enter**. Arrow keys resize it too. |
 | Focus a pane | Click inside it. |
 | Command palette | **⌘K**, then choose New tab, Open config or Focus terminal. |
 | Open config | **⌘,**. |
 | Move the window | Drag the title-bar area. |
 
-The right-click menu calls them “tabs,” but these actions create independent split panes inside the current tab. Dividers are deliberately subtle. Creating a split retains the existing terminal, scrollback and running shell; only the new pane gets a new shell. Closing a pane ends that pane's session. Sessions are not restored after quitting the application.
+The right-click menu creates independent split panes inside the current tab. Dividers are deliberately subtle. Creating a split retains the existing terminal, scrollback and running shell; only the new pane gets a new shell. Closing a pane ends that pane's session. Sessions are not restored after quitting the application.
 
 ### A real shell, not a command simulation
 

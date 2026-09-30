@@ -23,14 +23,43 @@ usage() {
     '       veil default [text]' \
     '       veil mac text' \
     '       veil image <path>' \
-    '       veil reminders [list|lists|add|done|help]'
+    '       veil pip [bound|unbound]' \
+    '       veil reminders [list|lists|add|done|help]' \
+    '       veil messages [chats|read|send|contacts|help]' \
+    '       veil spotify [status|play|pause|toggle|next|previous|volume|help]'
 }
 
 fail_usage() { usage >&2; exit 2; }
 [ "$#" -ge 1 ] || fail_usage
 
-# Image rendering stays independent from appearance configuration.
-if [ "$1" = "image" ] || [ "$1" = "reminders" ]; then
+if [ "$1" = "pip" ]; then
+  [ "$#" -le 2 ] || fail_usage
+  case "${2:-bound}" in bound|unbound) ;; *) fail_usage ;; esac
+  if [ "${TERM_PROGRAM:-}" != "Veil" ] || [ ! -t 1 ]; then
+    printf '%s\n' 'veil pip: run this command at a prompt inside Veil.' >&2
+    exit 1
+  fi
+  if [ "${2:-bound}" = unbound ]; then
+    printf '\033]777;veil-pip;unbound\007'
+  else
+    printf '\033]777;veil-pip\007'
+  fi
+  exit 0
+fi
+
+# Keep the original names as aliases; route Contacts within Messages.
+if [ "$1" = "messages" ] || [ "$1" = "imessage" ]; then
+  shift
+  if [ "${1:-}" = "contacts" ]; then
+    shift
+    set -- contacts "$@"
+  else
+    set -- imessage "$@"
+  fi
+fi
+
+# Native integrations stay independent from appearance configuration.
+if [ "$1" = "image" ] || [ "$1" = "reminders" ] || [ "$1" = "imessage" ] || [ "$1" = "spotify" ] || [ "$1" = "contacts" ]; then
   helper="veil-$1"
   if [ "$1" = "image" ]; then [ "$#" -eq 2 ] || fail_usage; fi
   script_path="$0"
