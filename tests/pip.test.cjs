@@ -27,6 +27,9 @@ test('PiP detection rejects grazing edges, occupied and small panes; selects onl
   assert.equal(overlap(rect,rect),1);
   assert.ok(target({...rect,x:200},[pane]).strength<TUNING.dock);
   assert.deepEqual(fit(rect,2),{x:0,y:50,width:400,height:200});
+  assert.deepEqual(fit(rect,2,6),{x:6,y:53,width:388,height:194});
+  assert.deepEqual(fit(rect,1,6),{x:56,y:6,width:288,height:288});
+  assert.ok(fit({x:0,y:0,width:5,height:5},1,6).width>=1);
 });
 function setup(){
   const win=new EventEmitter(),ipc=new EventEmitter(),events=[],commands=[];
@@ -72,8 +75,8 @@ test('selecting PiP for the command pane docks without a mouse drag',async()=>{
     assert.ok(s.events.some(m=>m.type==='content'&&m.paneId==='a'&&m.content.windowId==='dia:1'));
     assert.equal(s.commands.filter(m=>m.op==='set').length,0);
     s.panes([{id:'a',type:'external-pip',windowId:'dia:1',rect}]);
-    await new Promise(r=>setTimeout(r,90));
-    assert.ok(s.commands.some(m=>m.op==='set'),'acknowledged selection settles the actual PiP');
+    await new Promise(r=>setTimeout(r,1300));
+    assert.deepEqual(s.commands.filter(m=>m.op==='set').at(-1).rect,{x:8,y:6,width:384,height:288},'bound docking preserves its inset');
   }finally{s.controller.stop();s.win.emit('closed');}
 });
 test('veil pip emits the pane command only inside a Veil TTY',async()=>{
@@ -126,7 +129,7 @@ test('Linked PiP resizes its pane, detaches on a deliberate move, and stops on m
     s.panes([{id:'a',type:'external-pip',windowId:'dia:1',rect}]);
     s.frame(rect,true,{x:390,y:290});
     s.frame({...rect,width:440,height:330},true,{x:430,y:320});
-    assert.ok(s.events.some(m=>m.type==='resize-pane'&&m.width===440));
+    assert.ok(s.events.some(m=>m.type==='resize-pane'&&m.width===452&&m.height===342));
     s.frame(rect,false);s.frame(rect,true);s.frame({...rect,x:80},true,{x:100,y:20});
     assert.ok(s.events.some(m=>m.type==='content'&&m.content.type==='empty'));
     s.win.emit('minimize');assert.ok(s.events.some(m=>m.type==='preview'&&m.paneId===null));

@@ -1,5 +1,5 @@
 // Screen coordinates are macOS points / Electron DIPs, never backing pixels.
-const TUNING = Object.freeze({ preview: .28, dock: .62, minWidth: 160, minHeight: 100, undock: 32, stiffness: 390, damping: 32 });
+const TUNING = Object.freeze({ preview: .28, dock: .62, minWidth: 160, minHeight: 100, undock: 32, stiffness: 390, damping: 32, boundPadding: 6 });
 const valid = r => r && ['x','y','width','height'].every(k => Number.isFinite(r[k])) && r.width >= 1 && r.height >= 1;
 function overlap(a,b) {
   if (!valid(a) || !valid(b)) return 0;
@@ -11,7 +11,9 @@ function target(rect,panes) {
     .map(p=>({...p,strength:overlap(rect,p.rect)})).filter(p=>p.strength>=TUNING.preview)
     .sort((a,b)=>b.strength-a.strength || a.id.localeCompare(b.id))[0] || null;
 }
-function fit(rect,aspect) {
+function fit(rect,aspect,padding=0) {
+  const inset=Math.max(0,Math.min(padding,(rect.width-1)/2,(rect.height-1)/2));
+  rect={x:rect.x+inset,y:rect.y+inset,width:rect.width-2*inset,height:rect.height-2*inset};
   const width=Math.min(rect.width,rect.height*aspect),height=width/aspect;
   return {x:rect.x+(rect.width-width)/2,y:rect.y+(rect.height-height)/2,width,height};
 }

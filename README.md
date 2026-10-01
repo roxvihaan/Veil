@@ -18,9 +18,9 @@ CLI — coming soon.
 
 Open [Releases](https://github.com/roxvihaan/Veil/releases) and download the `.dmg` under **Assets** for the version you want.
 
-Download [Veil 0.1.3 for Apple Silicon](https://github.com/roxvihaan/Veil/releases/download/v0.1.3/Veil-0.1.3-arm64.dmg). It opens a large installer window with two big icons, an arrow, and **Drag Veil to Applications** instructions. Drag the Veil icon onto the Applications folder, eject the disk image, then launch Veil from Applications. No Node.js, npm or compiler is needed for the downloaded app.
+Download [Veil 0.1.4 for Apple Silicon](https://github.com/roxvihaan/Veil/releases/download/v0.1.4/Veil-0.1.4-arm64.dmg). It opens a large installer window with two big icons, an arrow, and **Drag Veil to Applications** instructions. Drag the Veil icon onto the Applications folder, eject the disk image, then launch Veil from Applications. No Node.js, npm or compiler is needed for the downloaded app.
 
-This release is **Apple Silicon only** (M1 or newer), targets macOS 12 or newer, and has been tested on macOS 26.5.1. Intel is not included. The [release page](https://github.com/roxvihaan/Veil/releases/tag/v0.1.3) also includes a SHA-256 checksum file.
+This release is **Apple Silicon only** (M1 or newer), targets macOS 12 or newer, and has been tested on macOS 26.5.1. Intel is not included. The [release page](https://github.com/roxvihaan/Veil/releases/tag/v0.1.4) also includes a SHA-256 checksum file.
 
 **First-launch security:** this release is ad-hoc signed, not Developer ID notarized. macOS may block the initial launch. Only if you trust this source, follow [Apple's instructions for approving an unnotarized app](https://support.apple.com/en-us/102445) in System Settings → Privacy & Security → Open Anyway after attempting to open it. Do not disable Gatekeeper or remove quarantine globally. This distribution does not change your security settings.
 
@@ -103,7 +103,7 @@ Do not point `NEOFETCH_REAL` at the wrapper itself. Ensure `~/.local/bin` preced
 
 ### PiP docking and draggable ASCII panes
 
-- `veil pip bound` or `veil pip`: fit PiP to the split, preserving the current linked sizing behavior.
+- `veil pip bound` or `veil pip`: fit PiP inside the split with a 6-point gap from its edges, preserving linked sizing and aspect ratio.
 - `veil pip unbound`: follow the split's center while keeping PiP at its own size. Resize it independently; it can extend outside the split. Neither window forces the other's size. Detaching and restoring the terminal work the same in both modes.
 
 Run `veil pip` in the split you want to use. This clears that split's view and parks its existing terminal without closing the shell or creating another split. Select your PiP from the app/window list and it docks directly—no extra drag required. **Return to terminal** restores the original session and scrollback. Veil links the real external window to the split without capturing video or changing playback. PiP no longer appears in the right-click menu. Discovery is app-independent: any PiP exposing movable/resizable windows through macOS Accessibility can be selected. Apps that do not expose those controls cannot be docked.

@@ -23,7 +23,7 @@ function installPiP(win,ipcMain,spawnHelper=spawn) {
   function destination(){
     const p=globalPanes().find(p=>p.id===linked);if(!p||!selected)return null;
     if(mode==='unbound')return {x:p.rect.x+(p.rect.width-selected.width)/2,y:p.rect.y+(p.rect.height-selected.height)/2,width:selected.width,height:selected.height};
-    const to=fit(p.rect,selected.aspect);
+    const to=fit(p.rect,selected.aspect,TUNING.boundPadding);
     if(selected.maxWidth&&to.width>selected.maxWidth){
       to.width=selected.maxWidth;to.height=to.width/selected.aspect;
       to.x=p.rect.x+(p.rect.width-to.width)/2;to.y=p.rect.y+(p.rect.height-to.height)/2;
@@ -72,7 +72,7 @@ function installPiP(win,ipcMain,spawnHelper=spawn) {
         const resizing=Math.abs(r.width-drag.rect.width)+Math.abs(r.height-drag.rect.height)>4;
         if(linked&&resizing){
           selected.aspect=r.width/r.height;selected.maxWidth=null;clampReported=false;
-          if(mode==='bound')send({type:'resize-pane',paneId:linked,width:r.width,height:r.height});
+          if(mode==='bound')send({type:'resize-pane',paneId:linked,width:r.width+2*TUNING.boundPadding,height:r.height+2*TUNING.boundPadding});
         }else if(linked&&distance(r,drag.rect)>TUNING.undock){
           const ongoing=drag;release();drag=ongoing;drag.wasLinked=null;
         }
@@ -98,7 +98,7 @@ function installPiP(win,ipcMain,spawnHelper=spawn) {
         // Respect a size that Dia clamps rather than hammering AX forever.
         clampReported=true;selected.aspect=r.width/r.height;
         if(r.width<to.width-2)selected.maxWidth=r.width;
-        send({type:'resize-pane',paneId:linked,width:r.width,height:r.height});
+        send({type:'resize-pane',paneId:linked,width:r.width+2*TUNING.boundPadding,height:r.height+2*TUNING.boundPadding});
         const adjusted=destination();if(adjusted)move(adjusted);
         send({type:'notice',message:'The source app constrains PiP size; the pane keeps its aspect ratio.'});
       }
